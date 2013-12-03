@@ -7,7 +7,11 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <string.h>
-main(argc, argv)
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int main(argc, argv)
 int argc;
 char *argv[];
 {
@@ -16,7 +20,7 @@ char *argv[];
   struct sockaddr_in server;
   int sock;
   static struct timeval timeout = { 5, 0 }; /* five seconds */
-  fd_set rmask, xmask, mask;
+  fd_set rmask, /*xmask,*/ mask;
   char buf[BUFSIZ];
   int nfound, bytesread;
 
