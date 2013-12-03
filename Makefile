@@ -1,11 +1,13 @@
 all: server client central-server peer testpeerlist
-central-server : central-server.c #const.h
+central-server : central-server.c const.h
 	gcc  -Wall -Werror -lnsl central-server.c -o central-server
-peer : peer.c #const.h
-	gcc  -Wall -Werror -lnsl peer.c -o peer
+peer : peer.o peerlist.o
+	gcc  -Wall -Werror peer.o peerlist.o -o peer
+peer.o : peer.c const.h
+	gcc -c -Wall -Werror peer.c
 server : server.c
 	gcc  -Wall -Werror -lnsl server.c -o server
-client : client.c
+client : client.c const.h
 	gcc  -Wall -Werror -lnsl client.c -o client
 testpeerlist : testpeerlist.o peerlist.o
 	gcc  -Wall -Werror testpeerlist.o peerlist.o -o testpeerlist
@@ -16,5 +18,5 @@ testpeerlist.o : testpeerlist.c peerlist.h
 clean:
 	rm *.o \
 	server client \
-	central-server peer\
+	central-server peer \
 	testpeerlist

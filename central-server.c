@@ -8,14 +8,19 @@
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
-main(argc, argv)
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(argc, argv)
 int argc;
 char *argv[];
 {
   struct servent *servp;
   struct sockaddr_in server, remote;
   int request_sock, new_sock;
-  int nfound, fd, maxfd, bytesread, addrlen;
+  int nfound, fd, maxfd, bytesread;
+  unsigned addrlen;
   fd_set rmask, mask;
   static struct timeval timeout = { 0, 500000 }; /* one half second */
   char buf[BUFSIZ];
@@ -32,7 +37,7 @@ char *argv[];
     servp = &s;
     s.s_port = htons((u_short)atoi(argv[1]));
   } else if ((servp = getservbyname(argv[1], "tcp")) == 0) {
-    fprintf(stderr,"%s: unknown service\n");
+    fprintf(stderr,"%s: unknown service\n", argv[1]);
     exit(1);
   }
   bzero((void *) &server, sizeof server);

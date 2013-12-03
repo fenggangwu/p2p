@@ -10,6 +10,8 @@
 #define GET "GET"
 #define PUSH "PUS"
 #define QUIT "QUT"
+#define IP "ADD"
 
+#define DELIMITER " "
 
 #endif

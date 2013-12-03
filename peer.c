@@ -8,18 +8,37 @@
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
-main(argc, argv)
+#include "peerlist.h"
+#include <stdlib.h>
+#include <string.h>
+#include "const.h"
+
+int main(argc, argv)
 int argc;
 char *argv[];
 {
   struct servent *servp;
   struct sockaddr_in server, remote;
+
+  char *ip;
+  unsigned short port;
+
   int request_sock, new_sock;
-  int nfound, fd, maxfd, bytesread, addrlen;
+  int nfound, fd, maxfd, bytesread;
+  unsigned addrlen;
   fd_set rmask, mask;
   int pid;
   static struct timeval timeout = { 0, 500000 }; /* one half second */
-  char buf[BUFSIZ];
+  char bufread[BUFSIZ];
+  char bufwrite[BUFSIZ];
+
+  char *tok;
+  char *requestfile;
+
+  /* neighbor list */
+  struct peerlist apeerlist, *peerlistp = &apeerlist;
+  peerlistinit(peerlistp);
+
   if (argc != 4) {
     (void) fprintf(stderr,"usage: %s local-port central-server-port central-server-host \n",argv[0]);
     exit(1);
@@ -33,7 +52,7 @@ char *argv[];
     servp = &s;
     s.s_port = htons((u_short)atoi(argv[1]));
   } else if ((servp = getservbyname(argv[1], "tcp")) == 0) {
-    fprintf(stderr,"%s: unknown service\n");
+    fprintf(stderr,"%s: unknown service\n", argv[1]);
     exit(1);
   }
   bzero((void *) &server, sizeof server);
@@ -64,7 +83,7 @@ char *argv[];
     }
   }
   
-  printf("This is the parent process\n");
+  printf("This is the parent process, %s, %s\n", argv[1], argv[2]);
 
   FD_ZERO(&mask);
   FD_SET(request_sock, &mask);
@@ -98,6 +117,17 @@ char *argv[];
       printf("connection from host %s, port %d, socket %d\n",
 	     inet_ntoa(remote.sin_addr), ntohs(remote.sin_port),
 	     new_sock);
+
+      /* echo IP. the host itself doesn't know its IP.*/
+      sprintf(bufwrite, "ip%s%s", DELIMITER, inet_ntoa(remote.sin_addr));
+
+      /* if (write(new_sock, "ip", 3) != 3) */
+      /* 	perror("ip"); */
+
+      if (write(new_sock, bufwrite, strlen(bufwrite)) != strlen(bufwrite))
+	perror("echoip");
+      printf("bufwrite <%s>, %d written\n", bufwrite, (int)strlen(bufwrite));
+
       FD_SET(new_sock, &mask);
       if (new_sock > maxfd)
 	maxfd = new_sock;
@@ -107,7 +137,7 @@ char *argv[];
       /* look for other sockets that have data available */
       if (FD_ISSET(fd, &rmask)) {
 	/* process the data */
-	bytesread = read(fd, buf, sizeof buf - 1);
+	bytesread = read(fd, bufread, sizeof bufread - 1);
 	if (bytesread<0) {
 	  perror("read");
 	  /* fall through */
@@ -118,13 +148,59 @@ char *argv[];
 	  if (close(fd)) perror("close");
 	  continue;
 	}
-	buf[bytesread] = '\0';
-	printf("%s: %d bytes from %d: %s\n",
-	       argv[0], bytesread, fd, buf);
+
+	addrlen = sizeof(remote);
+	if(getsockname(fd, (struct sockaddr*)&remote, &addrlen)<0){
+	  perror("getsockname");
+	  exit(1);
+	}
+
+	ip = inet_ntoa(remote.sin_addr);
+	port = ntohs(remote.sin_port);
+
+	bufread[bytesread] = '\0';
+	printf("\n\n%s: %d bytes from %d (%hu, %s): %s\n",
+	       argv[0], bytesread, fd, port, ip, bufread);
+
+	if((tok = strtok(bufread, DELIMITER))){
+	  /* msg format: "reg port xxx.xxx.xxx.xxx" */
+	  if(!strcmp(tok, "reg")){
+	    if ((tok = strtok(NULL, DELIMITER))){
+	      port = atoi(tok);
+	      if ((tok = strtok(NULL, DELIMITER))){
+		ip = tok;
+		printf("reg from (%hu, %s)\n", port, ip);
+		peerlistinsert(peerlistp, port, ip);
+		//peerlistprint(peerlistp);
+	      }
+	    }
+	  }else if (!strcmp(tok, "get")){ /* "get port ip filename " */
+	    if ((tok = strtok(NULL, DELIMITER))){
+	      port = atoi(tok);
+	      if ((tok = strtok(NULL, DELIMITER))){
+		ip = tok;
+		if ((tok = strtok(NULL, DELIMITER))){
+		  requestfile = tok;
+		  printf("get from (%hu, %s), file=<%s>\n", 
+			 port, ip, requestfile);
+		  //todo
+		  
+		}
+	      }
+	    }
+	  }else{
+	    ;/* ignore illegal message here */
+	  }
+	}
+
+	/* if(handlemsg(buf, peerlistp)<0){ */
+	/*   perror("handlemsg"); */
+	/* } */
 	/* echo it back */
-	if (write(fd, buf, bytesread)!=bytesread)
+	if (write(fd, bufread, bytesread)!=bytesread)
 	  perror("echo");
       }
     }
   }
 } /* main - server.c */
+

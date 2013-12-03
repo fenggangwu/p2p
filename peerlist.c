@@ -90,7 +90,7 @@ int peerlistsearch(struct peerlist* peerlistp,
       return 1;
     }
   }
-  printf("search (%hu, %s) failed\n", port, ip);
+  printf("search (%hu, %s) not found\n", port, ip);
   return 0;
 }
 
