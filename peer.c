@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
+#include <unistd.h>
 main(argc, argv)
 int argc;
 char *argv[];
@@ -16,10 +17,11 @@ char *argv[];
   int request_sock, new_sock;
   int nfound, fd, maxfd, bytesread, addrlen;
   fd_set rmask, mask;
+  int pid;
   static struct timeval timeout = { 0, 500000 }; /* one half second */
   char buf[BUFSIZ];
-  if (argc != 2) {
-    (void) fprintf(stderr,"usage: %s service\n",argv[0]);
+  if (argc != 4) {
+    (void) fprintf(stderr,"usage: %s local-port central-server-port central-server-host \n",argv[0]);
     exit(1);
   }
   if ((request_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
@@ -46,6 +48,24 @@ char *argv[];
     perror("listen");
     exit(1);
   }
+
+  if ((pid = fork()) < 0){
+    perror("fork");
+    exit(1);
+  }
+
+  printf("%s %s pid=%d\n", argv[2], argv[3], pid);
+
+  if (pid == 0){
+    printf("This is the child process\n");
+    if (execl("client", "client",  argv[2], argv[3], NULL) < 0){
+      perror("execl");
+      exit(-1);
+    }
+  }
+  
+  printf("This is the parent process\n");
+
   FD_ZERO(&mask);
   FD_SET(request_sock, &mask);
   maxfd = request_sock;

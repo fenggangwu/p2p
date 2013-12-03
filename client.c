@@ -19,6 +19,9 @@ char *argv[];
   fd_set rmask, xmask, mask;
   char buf[BUFSIZ];
   int nfound, bytesread;
+
+  printf("This is child process\n");
+
   if (argc != 3) {
     (void) fprintf(stderr,"usage: %s service host\n",argv[0]);
     exit(1);
@@ -48,6 +51,9 @@ char *argv[];
     perror("connect");
     exit(1);
   }
+
+  printf("Client connected\n");
+
   FD_ZERO(&mask);
   FD_SET(sock, &mask);
   FD_SET(fileno(stdin), &mask);

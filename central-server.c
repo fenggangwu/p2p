@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
+#include <unistd.h>
 main(argc, argv)
 int argc;
 char *argv[];
