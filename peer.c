@@ -31,9 +31,19 @@ char *argv[];
   static struct timeval timeout = { 0, 500000 }; /* one half second */
   char bufread[BUFSIZ];
   char bufwrite[BUFSIZ];
+  char msg[BUFSIZ];
+
+  char portstr[6]; /* max port num: 65535*/
 
   char *tok;
-  char *requestfile;
+  char *filename;
+
+  char cwd[256];
+  char path[256];
+
+  FILE *fp;
+
+  struct ipport* ptr;
 
   /* neighbor list */
   struct peerlist apeerlist, *peerlistp = &apeerlist;
@@ -66,6 +76,11 @@ char *argv[];
   if (listen(request_sock, SOMAXCONN) < 0) {
     perror("listen");
     exit(1);
+  }
+
+  if(!getcwd(cwd, 256)){
+    perror(cwd);
+    exit(-1);
   }
 
   if ((pid = fork()) < 0){
@@ -149,20 +164,25 @@ char *argv[];
 	  continue;
 	}
 
+	strcpy(msg, bufread); /* make a copy, not to destroy the read buf*/
+
 	addrlen = sizeof(remote);
 	if(getsockname(fd, (struct sockaddr*)&remote, &addrlen)<0){
 	  perror("getsockname");
-	  exit(1);
+	  exit(-1);
 	}
 
-	ip = inet_ntoa(remote.sin_addr);
-	port = ntohs(remote.sin_port);
+	//ip = inet_ntoa(remote.sin_addr);
+	//port = ntohs(remote.sin_port);
 
-	bufread[bytesread] = '\0';
-	printf("\n\n%s: %d bytes from %d (%hu, %s): %s\n",
-	       argv[0], bytesread, fd, port, ip, bufread);
+	
 
-	if((tok = strtok(bufread, DELIMITER))){
+	msg[bytesread] = '\0';
+	
+	//printf("\n\n%s: %d bytes from %d (%hu, %s): %s\n",
+	//       argv[0], bytesread, fd, port, ip, msg);
+
+	if((tok = strtok(msg, DELIMITER))){
 	  /* msg format: "reg port xxx.xxx.xxx.xxx" */
 	  if(!strcmp(tok, "reg")){
 	    if ((tok = strtok(NULL, DELIMITER))){
@@ -180,11 +200,45 @@ char *argv[];
 	      if ((tok = strtok(NULL, DELIMITER))){
 		ip = tok;
 		if ((tok = strtok(NULL, DELIMITER))){
-		  requestfile = tok;
+		  filename = tok;
 		  printf("get from (%hu, %s), file=<%s>\n", 
-			 port, ip, requestfile);
-		  //todo
-		  
+			 port, ip, filename);
+
+
+		  /*try to read the file in cwd*/
+		  strcpy(path, cwd);
+		  strcat(path, filename);
+		  printf("Opening <%s>...\n", path);
+		  if(!(fp = fopen(path, "r"))){
+		    if(errno == ENOENT){//if this file does not exist
+		      //todo forward to other neighbors
+		      for(ptr = peerlistp->head; ptr; ptr = ptr->next){
+			pid = fork();
+			if (pid == 0){
+			  sprintf(portstr, "%hu", ptr->port);
+			  printf("in child process pid = %d, <%s>, <%s>\n", 
+				 pid, portstr, inet_ntoa(ptr->addr));
+			  if (execl("client", "client",  
+				    portstr, inet_ntoa(ptr->addr), bufread,
+				    NULL) < 0){
+			    perror("execl");
+			    exit(-1);
+			  }
+			}
+		      }
+		    }else{
+		      //perror("fopen");
+		      //exit(-1);
+		      ; /* for robustness, still working */
+		    }
+		  }else{
+		    //todo read the file and return it to the requester
+		    
+		    if(!fclose(fp)){
+		      perror("fclose");
+		      exit(-1);
+		    }
+		  }
 		}
 	      }
 	    }

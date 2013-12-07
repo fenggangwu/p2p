@@ -26,17 +26,27 @@ char *argv[];
   fd_set rmask, /*xmask,*/ mask;
   char bufread[BUFSIZ];
   char bufwrite[BUFSIZ];
+  char *msg = NULL; /*store the msg to be sent*/
+
   int nfound, bytesread;
   char mysvrip[BUFSIZ];
   unsigned short mysvrport;
   char *tok;
 
-  printf("This is child process\n");
 
-  if (argc != 4) {
-    (void) fprintf(stderr,"usage: %s remoteport remoteip mysvrport\n",argv[0]);
+  if ((argc != 5) && (argc != 4)) {
+    (void) fprintf(stderr,"usage: %s remoteport remoteip mysvrport (msg)\n",
+		   argv[0]);
     exit(1);
   }
+
+  if(argc == 5){
+    msg = argv[4];
+  }
+
+  printf("in child process exec: %s %s %s %s %s\n", 
+	 argv[0], argv[1], argv[2], argv[3], argv[4]);
+
   if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
     perror("socket");
     exit(1);
@@ -100,7 +110,11 @@ char *argv[];
 	exit(0);
       }
 
+      //     printf("the input msg is: <%s>\n", bufread);
+
       /*TODO eliminate tailing \n*/
+      bufread[strlen(bufread)-1] = '\0';
+      //      printf("the input msg is: <%s>\n", bufread);
       if (write(sock, bufread, strlen(bufread)) < 0) {
 	perror("write");
 	exit(1);
@@ -116,12 +130,22 @@ char *argv[];
 	  if ((tok = strtok(NULL, DELIMITER))){
 	    sprintf(mysvrip, "%s", tok);
 	    
-	    /* msg format: "reg port xxx.xxx.xxx.xxx" */
-	    sprintf(bufwrite, "reg%s%hu%s%s", 
-		    DELIMITER, mysvrport, DELIMITER, mysvrip);
-	    if(write(sock, bufwrite, strlen(bufwrite)) != strlen(bufwrite)){
-	      perror("reg");
-	      exit(-1);
+	    if(msg){
+	      /* forward the msg to */
+	      if(write(sock, msg, strlen(msg)) != 
+		 strlen(msg)){
+		perror("fwdmsg");
+		exit(-1);
+	      }
+	    }else{
+	      /* msg format: "reg port xxx.xxx.xxx.xxx" */
+	      sprintf(bufwrite, "reg%s%hu%s%s", 
+		      DELIMITER, mysvrport, DELIMITER, mysvrip);
+	      if(write(sock, bufwrite, strlen(bufwrite)) != 
+		 strlen(bufwrite)){
+		perror("reg");
+		exit(-1);
+	      }
 	    }
 	  }
 	}else{
