@@ -14,18 +14,20 @@
 #include "const.h"
 #include <dirent.h>
 
+
+
 int main(argc, argv)
 int argc;
 char *argv[];
 {
-  struct servent *servp;
+  //  struct servent *servp;
   struct sockaddr_in server, remote;
 
   char *ip;
   unsigned short port;
 
   int request_sock, new_sock;
-  int nfound, fd, maxfd, bytesread, nmatch, ndir;
+  int nfound, fd, maxfd, bytesread, nmatch, ndir, i;
   unsigned addrlen;
   fd_set rmask, mask;
   int pid;
@@ -40,52 +42,61 @@ char *argv[];
   char filename[256];
   char otherhost[256];
 
-  char sharedir[256];
+  char *sharedir;
   char path[256];
 
   FILE *fp;
 
   struct ipport* ptr;
   struct dirent **namelist;
+
+  char nbrlist[BUFSIZ];
   
 
   /* neighbor list */
   struct peerlist apeerlist, *peerlistp = &apeerlist;
   peerlistinit(peerlistp);
 
-  if (argc != 5) {
-    (void) fprintf(stderr,"usage: %s sharedir local-port central-server-port central-server-host \n",argv[0]);
+  if (argc != 3) {
+    (void) fprintf(stderr,"usage: %s sharedir central-server-host \n",argv[0]);
     exit(1);
   }
   if ((request_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
     perror("socket");
     exit(1);
   }
-  if (isdigit(argv[2][0])) {
-    static struct servent s;
-    servp = &s;
-    s.s_port = htons((u_short)atoi(argv[2]));
-  } else if ((servp = getservbyname(argv[2], "tcp")) == 0) {
-    fprintf(stderr,"%s: unknown service\n", argv[2]);
-    exit(1);
-  }
+
+  /* if (isdigit(argv[2][0])) { */
+  /*   static struct servent s; */
+  /*   servp = &s; */
+  /*   s.s_port = htons((u_short)atoi(argv[2])); */
+  /* } else if ((servp = getservbyname(argv[2], "tcp")) == 0) { */
+  /*   fprintf(stderr,"%s: unknown service\n", argv[2]); */
+  /*   exit(1); */
+  /*} */
   bzero((void *) &server, sizeof server);
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = servp->s_port;
+  /* server.sin_port = servp->s_port; */
+  server.sin_port = htons(P2PSERV);
   if (bind(request_sock, (struct sockaddr *)&server, sizeof server) < 0) {
     perror("bind");
     exit(1);
   }
+
   if (listen(request_sock, SOMAXCONN) < 0) {
     perror("listen");
     exit(1);
   }
 
-  if(!getcwd(sharedir, 256)){
-    perror(sharedir);
-    exit(-1);
-  }
+  sharedir = argv[1];
+
+  printf("shared dir set to %s\n", sharedir);
+
+  /* if(!getcwd(sharedir, 256)){ */
+  /*   perror(sharedir); */
+  /*   exit(-1); */
+  /* } */
 
   /* if ((pid = fork()) < 0){ */
   /*   perror("fork"); */
@@ -148,6 +159,21 @@ char *argv[];
       if(!strncmp(bufread, "get", 3)){
 	if((nmatch = sscanf(bufread, "get %s", filename)) == 1){
 	  printf("get <%s>\n", filename);
+	  for(ptr = peerlistp->head; ptr; ptr = ptr->next){
+	    if((pid = fork()) < 0){
+	      perror("fork");
+	      exit(-1);
+	    };
+	    if(pid == 0){
+	      if(execl("messenger", "messenger", 
+		       inet_ntoa(ptr->addr), /* nbr ip */
+		       "get", filename, NULL) 
+		 <0){ /* msg to nbr */
+		perror("execel");
+		exit(-1);
+	      }
+	    }
+	  }
 	}else if(errno !=0){
 	  perror("scanf");
 	}else{
@@ -155,7 +181,20 @@ char *argv[];
 	}
       }else if(!strncmp(bufread, "share", 5)){
 	if((nmatch = sscanf(bufread, "share %s %s", filename, otherhost)) == 2){
-	  printf("get <%s> <%s>\n", filename, otherhost);
+	  printf("share <%s> <%s>\n", filename, otherhost);
+	  if((pid = fork())<0){
+	    perror("fork");
+	    exit(-1);
+	  }
+	  if(pid ==0){
+	    if(execl("messenger", "messenger",
+		     inet_ntoa(ptr->addr),
+		     "push", filename, NULL)<0){
+	      perror("execl");
+	      exit(-1);
+	    }
+	  }
+	  
 	}else if(errno !=0){
 	  perror("scanf");
 	}else{
@@ -173,9 +212,42 @@ char *argv[];
 	  free(namelist);
 	}
       }else if(!strncmp(bufread, "quit", 4)){
-	;
+	strcpy(nbrlist, ""); /* init */
+	for(i=1, ptr=peerlistp->head; i < peerlistp->cnt; 
+	    i++, ptr=ptr->next){ /*stop before the last one*/
+	  if((pid = fork())<0){
+	    perror("fork");
+	    exit(-1);
+	  }
+	  if(pid ==0){
+	    if(execl("messenger", "messenger",
+		     inet_ntoa(ptr->addr),
+		     "quit", NULL)<0){
+	      perror("execl");
+	      exit(-1);
+	    }
+	  }
+	  if(i > 1){
+	    strcat(nbrlist, " ");
+	  }
+	  strcat(nbrlist, inet_ntoa(ptr->addr));
+	}
+
+	if((pid = fork())<0){
+	  perror("fork");
+	  exit(-1);
+	}
+	if(pid ==0){
+	  if(execl("messenger", "messenger",
+		   inet_ntoa(ptr->addr),
+		   "quit", nbrlist, NULL)<0){
+	    perror("execl");
+	    exit(-1);
+	  }
+	}
+
       }else{
-	printf("invalid command: %s\n", bufread); /* ignore ivalid command*/
+	printf("invalid command: %s\n", bufread); /* ignore invalid command*/
       }
 
       FD_CLR(fileno(stdin), &rmask);

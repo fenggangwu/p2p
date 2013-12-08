@@ -14,4 +14,6 @@
 
 #define DELIMITER " "
 
+#define P2PSERV 8980 /* port number for this p2p service*/
+
 #endif

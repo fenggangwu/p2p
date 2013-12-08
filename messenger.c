@@ -13,13 +13,13 @@
 #include "const.h"
 
 
-/* format: ./client remoteport remortip cmd cmd2 (cmd3)*/
+/* format: ./client remoteport remortip cmd (cmd2)*/
 int main(argc, argv)
 int argc;
 char *argv[];
 {
   struct hostent *hostp;
-  struct servent *servp;
+  //  struct servent *servp;
   struct sockaddr_in server;
   int sock;
   static struct timeval timeout = { 5, 0 }; /* five seconds */
@@ -34,21 +34,21 @@ char *argv[];
   char *tok;
 
 
-  if((argc !=5) && (argc != 6)) {
-    (void) fprintf(stderr,"usage: %s remoteport remoteip cmd cmd2 (cmd3)\n",
+  if((argc !=4) && (argc != 5)) {
+    (void) fprintf(stderr,"usage: %s remoteport remoteip cmd (cmd2)\n",
 		   argv[0]);
     exit(1);
   }
 
   
-  if(argc == 5){
-    printf("in child process exec: <%s> <%s> <%s> <%s> <%s>\n", 	 
+  if(argc == 4){
+    printf("in child process exec: <%s> <%s> <%s><%s>\n", 	 
 	   argv[0], argv[1], argv[2], 
-	   argv[3], argv[4]);
+	   argv[3]);
 
   }else {
-    printf("in child process exec: <%s> <%s> <%s> <%s> <%s> <%s>\n",
-	   argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+    printf("in child process exec: <%s> <%s> <%s> <%s> <%s>\n",
+	   argv[0], argv[1], argv[2], argv[3], argv[4]);
   }
   
   if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
@@ -56,23 +56,14 @@ char *argv[];
     exit(1);
   }
 
-  if (isdigit(argv[1][0])) {
-    static struct servent s;
-    servp = &s;
-    s.s_port = htons((u_short)atoi(argv[1]));
-  } else if ((servp = getservbyname(argv[1], "tcp")) == 0) {
-    fprintf(stderr,"%s: unknown service\n",argv[1]);
-    exit(1);
-  }
-
-  if ((hostp = gethostbyname(argv[2])) == 0) {
-    fprintf(stderr,"%s: unknown host\n",argv[2]);
+  if ((hostp = gethostbyname(argv[1])) == 0) {
+    fprintf(stderr,"%s: unknown host\n",argv[1]);
     exit(1);
   }
   memset((void *) &server, 0, sizeof server);
   server.sin_family = AF_INET;
   memcpy((void *) &server.sin_addr, hostp->h_addr, hostp->h_length);
-  server.sin_port = servp->s_port;
+  server.sin_port = htons(P2PSERV);
   if (connect(sock, (struct sockaddr *)&server, sizeof server) < 0) {
     (void) close(sock);
     perror("connect");
@@ -113,33 +104,37 @@ char *argv[];
 	    sprintf(localaddr, "%s", tok);
 		    
 	    bzero(bufwrite, sizeof(bufwrite));
-	    if(!strcmp(argv[3], "reg")){/*reg myport*/
-	      /* msg format: "reg port xxx.xxx.xxx.xxx" */
-	      sprintf(bufwrite, "reg%s%s%s%s", 
-		      DELIMITER, argv[4], DELIMITER, localaddr);
-	    }else if(!strcmp(argv[3], "get")){/* get myport filename */
-	      sprintf(bufwrite, "get%s%s%s%s%s%s",
-		      DELIMITER, argv[4], DELIMITER, localaddr,
-		      DELIMITER, argv[5]);
-	    }else if(!strcmp(argv[3], "fwd")){
+	    if(!strcmp(argv[2], "reg")){/*reg myport*/
+	      /* msg format: "reg xxx.xxx.xxx.xxx" */
+	      sprintf(bufwrite, "reg%s%s", DELIMITER, localaddr);
+	    }else if(!strcmp(argv[2], "get")){/* get filename */
+	      /* msg format: "get xxx.xxx.xxx.xxx filename "*/
+	      sprintf(bufwrite, "get%s%s%s%s",
+		      DELIMITER, localaddr,
+		      DELIMITER, argv[3]);
+	    }else if(!strcmp(argv[2], "fwd")){
 	      strcpy(bufwrite, "get");
-	      strcat(bufwrite, &argv[3][3]); /*replace "fwd" with "get" */
-	    }else if(!strcmp(argv[3], "push")){
-	      sprintf(bufwrite, "push%s%s%s%s%s%s",
-		      DELIMITER, argv[4], DELIMITER, localaddr,
-		      DELIMITER, argv[5]);
-	    }else if(!strcmp(argv[3], "quit")){
-	      sprintf(bufwrite, "quit%s%s%s%s%s%s",
-		      DELIMITER, argv[4], DELIMITER, localaddr,
-		      DELIMITER, argv[5]);
+	      strcat(bufwrite, &argv[2][3]); /*replace "fwd" with "get" */
+	    }else if(!strcmp(argv[2], "push")){
+	      sprintf(bufwrite, "push%s%s%s%s",
+		      DELIMITER, localaddr,
+		      DELIMITER, argv[3]);
+	    }else if(!strcmp(argv[2], "quit")){
+	      if(argc == 4){
+		sprintf(bufwrite, "quit%s%s%s%s",
+			DELIMITER, localaddr,
+			DELIMITER, argv[3]);
+	      }else{
+		sprintf(bufwrite, "quit%s%s", DELIMITER, localaddr);
+	      }
 	    }else{/* unrecognized arg[3] msg */
 	      (void) fprintf(stderr,"invalid arg[3] format <%s>\n",
-			     argv[3]);
+			     argv[2]);
 	      exit(1);
 	    }
 
-	    printf("sending msg to <%s> <%s>: <%s>...\n", 
-		   argv[1], argv[2], bufwrite);
+	    printf("sending msg to <%s>: <%s>...\n", 
+		   argv[1], bufwrite);
 
 	    if(write(sock, bufwrite, strlen(bufwrite)) != 
 		 strlen(bufwrite)){
@@ -147,8 +142,8 @@ char *argv[];
 		exit(-1);
 	    }
 
-	    printf("sent msg to <%s> <%s>: <%s>\n", 
-		   argv[1], argv[2], bufwrite);
+	    printf("sent msg to <%s>: <%s>\n", 
+		   argv[1], bufwrite);
 	  }
 	}else{
 	  ; /*ignore the message comming other than "ip XX.XXX.XXX.XXX"*/
