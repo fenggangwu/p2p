@@ -33,6 +33,7 @@ char *argv[];
 
   char *tok;
 
+  printf("peer: fork successed.\n");
 
   if((argc !=4) && (argc != 5)) {
     (void) fprintf(stderr,"usage: %s remoteport remoteip cmd (cmd2)\n",

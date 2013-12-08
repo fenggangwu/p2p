@@ -173,6 +173,7 @@ char *argv[];
 		exit(-1);
 	      }
 	    }
+	    printf("peer: fork successed.\n");
 	  }
 	}else if(errno !=0){
 	  perror("scanf");
