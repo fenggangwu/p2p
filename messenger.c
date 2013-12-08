@@ -13,7 +13,7 @@
 #include "const.h"
 
 
-/* format: ./client remoteport remortip mysvrport */
+/* format: ./client remoteport remortip cmd cmd2 (cmd3)*/
 int main(argc, argv)
 int argc;
 char *argv[];
@@ -26,31 +26,36 @@ char *argv[];
   fd_set rmask, /*xmask,*/ mask;
   char bufread[BUFSIZ];
   char bufwrite[BUFSIZ];
-  char *msg = NULL; /*store the msg to be sent*/
+
+  char localaddr[256];
 
   int nfound, bytesread;
-  char mysvrip[BUFSIZ];
-  unsigned short mysvrport;
+
   char *tok;
 
 
-  if ((argc != 5) && (argc != 4)) {
-    (void) fprintf(stderr,"usage: %s remoteport remoteip mysvrport (msg)\n",
+  if((argc !=5) && (argc != 6)) {
+    (void) fprintf(stderr,"usage: %s remoteport remoteip cmd cmd2 (cmd3)\n",
 		   argv[0]);
     exit(1);
   }
 
+  
   if(argc == 5){
-    msg = argv[4];
+    printf("in child process exec: <%s> <%s> <%s> <%s> <%s>\n", 	 
+	   argv[0], argv[1], argv[2], 
+	   argv[3], argv[4]);
+
+  }else {
+    printf("in child process exec: <%s> <%s> <%s> <%s> <%s> <%s>\n",
+	   argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
   }
-
-  printf("in child process exec: %s %s %s %s %s\n", 
-	 argv[0], argv[1], argv[2], argv[3], argv[4]);
-
+  
   if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
     perror("socket");
     exit(1);
   }
+
   if (isdigit(argv[1][0])) {
     static struct servent s;
     servp = &s;
@@ -58,10 +63,6 @@ char *argv[];
   } else if ((servp = getservbyname(argv[1], "tcp")) == 0) {
     fprintf(stderr,"%s: unknown service\n",argv[1]);
     exit(1);
-  }
-
-  if (isdigit(argv[3][0])){ 
-    mysvrport = (unsigned short)atoi(argv[3]);
   }
 
   if ((hostp = gethostbyname(argv[2])) == 0) {
@@ -82,7 +83,8 @@ char *argv[];
 
   FD_ZERO(&mask);
   FD_SET(sock, &mask);
-  FD_SET(fileno(stdin), &mask);
+  /* this messenger will not listen to keyboard input*/
+  //  FD_SET(fileno(stdin), &mask); 
   for (;;) {
     rmask = mask;
     nfound = select(FD_SETSIZE, &rmask, (fd_set *)0, (fd_set *)0, &timeout);
@@ -100,56 +102,56 @@ char *argv[];
       //      printf("Please type something!\n");
       continue;
     }
-    if (FD_ISSET(fileno(stdin), &rmask)) {
-      /* data from keyboard */
-      if (!fgets(bufread, sizeof bufread, stdin)) {
-	if (ferror(stdin)) {
-	  perror("stdin");
-	  exit(1);
-	}
-	exit(0);
-      }
-
-      //     printf("the input msg is: <%s>\n", bufread);
-
-      /*TODO eliminate tailing \n*/
-      bufread[strlen(bufread)-1] = '\0';
-      //      printf("the input msg is: <%s>\n", bufread);
-      if (write(sock, bufread, strlen(bufread)) < 0) {
-	perror("write");
-	exit(1);
-      }
-    }
     if (FD_ISSET(sock,&rmask)) {
       /* data from network */
       bytesread = read(sock, bufread, sizeof(bufread));
       bufread[bytesread] = '\0';
       printf("%s: got %d bytes (%d, %d): %s\n", argv[0], bytesread, (int)sizeof(bufread), (int)strlen(bufread), bufread);
       if((tok = strtok(bufread, DELIMITER))){
-	if(!strcmp(tok, "ip")){ /* msg format: "ip|xxx.xxx.xxx.xxx" */
+	if(!strcmp(tok, "ip")){ /* msg format: "ip xxx.xxx.xxx.xxx" */
 	  if ((tok = strtok(NULL, DELIMITER))){
-	    sprintf(mysvrip, "%s", tok);
-	    
-	    if(msg){
-	      /* forward the msg to */
-	      if(write(sock, msg, strlen(msg)) != 
-		 strlen(msg)){
-		perror("fwdmsg");
-		exit(-1);
-	      }
-	    }else{
+	    sprintf(localaddr, "%s", tok);
+		    
+	    bzero(bufwrite, sizeof(bufwrite));
+	    if(!strcmp(argv[3], "reg")){/*reg myport*/
 	      /* msg format: "reg port xxx.xxx.xxx.xxx" */
-	      sprintf(bufwrite, "reg%s%hu%s%s", 
-		      DELIMITER, mysvrport, DELIMITER, mysvrip);
-	      if(write(sock, bufwrite, strlen(bufwrite)) != 
+	      sprintf(bufwrite, "reg%s%s%s%s", 
+		      DELIMITER, argv[4], DELIMITER, localaddr);
+	    }else if(!strcmp(argv[3], "get")){/* get myport filename */
+	      sprintf(bufwrite, "get%s%s%s%s%s%s",
+		      DELIMITER, argv[4], DELIMITER, localaddr,
+		      DELIMITER, argv[5]);
+	    }else if(!strcmp(argv[3], "fwd")){
+	      strcpy(bufwrite, "get");
+	      strcat(bufwrite, &argv[3][3]); /*replace "fwd" with "get" */
+	    }else if(!strcmp(argv[3], "push")){
+	      sprintf(bufwrite, "push%s%s%s%s%s%s",
+		      DELIMITER, argv[4], DELIMITER, localaddr,
+		      DELIMITER, argv[5]);
+	    }else if(!strcmp(argv[3], "quit")){
+	      sprintf(bufwrite, "quit%s%s%s%s%s%s",
+		      DELIMITER, argv[4], DELIMITER, localaddr,
+		      DELIMITER, argv[5]);
+	    }else{/* unrecognized arg[3] msg */
+	      (void) fprintf(stderr,"invalid arg[3] format <%s>\n",
+			     argv[3]);
+	      exit(1);
+	    }
+
+	    printf("sending msg to <%s> <%s>: <%s>...\n", 
+		   argv[1], argv[2], bufwrite);
+
+	    if(write(sock, bufwrite, strlen(bufwrite)) != 
 		 strlen(bufwrite)){
 		perror("reg");
 		exit(-1);
-	      }
 	    }
+
+	    printf("sent msg to <%s> <%s>: <%s>\n", 
+		   argv[1], argv[2], bufwrite);
 	  }
 	}else{
-	  ;
+	  ; /*ignore the message comming other than "ip XX.XXX.XXX.XXX"*/
 	}
       }
     }

@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "const.h"
+#include <dirent.h>
 
 int main(argc, argv)
 int argc;
@@ -24,7 +25,7 @@ char *argv[];
   unsigned short port;
 
   int request_sock, new_sock;
-  int nfound, fd, maxfd, bytesread;
+  int nfound, fd, maxfd, bytesread, nmatch, ndir;
   unsigned addrlen;
   fd_set rmask, mask;
   int pid;
@@ -36,33 +37,36 @@ char *argv[];
   char portstr[6]; /* max port num: 65535*/
 
   char *tok;
-  char *filename;
+  char filename[256];
+  char otherhost[256];
 
-  char cwd[256];
+  char sharedir[256];
   char path[256];
 
   FILE *fp;
 
   struct ipport* ptr;
+  struct dirent **namelist;
+  
 
   /* neighbor list */
   struct peerlist apeerlist, *peerlistp = &apeerlist;
   peerlistinit(peerlistp);
 
-  if (argc != 4) {
-    (void) fprintf(stderr,"usage: %s local-port central-server-port central-server-host \n",argv[0]);
+  if (argc != 5) {
+    (void) fprintf(stderr,"usage: %s sharedir local-port central-server-port central-server-host \n",argv[0]);
     exit(1);
   }
   if ((request_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
     perror("socket");
     exit(1);
   }
-  if (isdigit(argv[1][0])) {
+  if (isdigit(argv[2][0])) {
     static struct servent s;
     servp = &s;
-    s.s_port = htons((u_short)atoi(argv[1]));
-  } else if ((servp = getservbyname(argv[1], "tcp")) == 0) {
-    fprintf(stderr,"%s: unknown service\n", argv[1]);
+    s.s_port = htons((u_short)atoi(argv[2]));
+  } else if ((servp = getservbyname(argv[2], "tcp")) == 0) {
+    fprintf(stderr,"%s: unknown service\n", argv[2]);
     exit(1);
   }
   bzero((void *) &server, sizeof server);
@@ -78,30 +82,31 @@ char *argv[];
     exit(1);
   }
 
-  if(!getcwd(cwd, 256)){
-    perror(cwd);
+  if(!getcwd(sharedir, 256)){
+    perror(sharedir);
     exit(-1);
   }
 
-  if ((pid = fork()) < 0){
-    perror("fork");
-    exit(1);
-  }
+  /* if ((pid = fork()) < 0){ */
+  /*   perror("fork"); */
+  /*   exit(1); */
+  /* } */
 
-  printf("%s %s pid=%d\n", argv[2], argv[3], pid);
+  /* printf("%s %s pid=%d\n", argv[2], argv[3], pid); */
 
-  if (pid == 0){
-    printf("This is the child process\n");
-    if (execl("client", "client",  argv[2], argv[3], NULL) < 0){
-      perror("execl");
-      exit(-1);
-    }
-  }
+  /* if (pid == 0){ */
+  /*   printf("This is the child process\n"); */
+  /*   if (execl("client", "client",  argv[2], argv[3], NULL) < 0){ */
+  /*     perror("execl"); */
+  /*     exit(-1); */
+  /*   } */
+  /* } */
   
-  printf("This is the parent process, %s, %s\n", argv[1], argv[2]);
+  /* printf("This is the parent process, %s, %s\n", argv[1], argv[2]); */
 
   FD_ZERO(&mask);
   FD_SET(request_sock, &mask);
+  FD_SET(fileno(stdin), &mask);
   maxfd = request_sock;
   for (;;) {
     rmask = mask;
@@ -120,6 +125,62 @@ char *argv[];
       //      printf("."); fflush(stdout);
       continue;
     }
+
+    if (FD_ISSET(fileno(stdin), &rmask)) {
+      /* data from keyboard */
+      if (!fgets(bufread, sizeof bufread, stdin)) {
+	if (ferror(stdin)) {
+	  perror("stdin");
+	  exit(1);
+	}
+	exit(0);
+      }
+
+      //     printf("the input msg is: <%s>\n", bufread);
+
+      /* eliminate tailing \n*/
+      bufread[strlen(bufread)-1] = '\0';
+      printf("the input msg is: <%s>\n", bufread);
+
+      /* TODO parse the input command and process */
+      errno = 0;
+
+      if(!strncmp(bufread, "get", 3)){
+	if((nmatch = sscanf(bufread, "get %s", filename)) == 1){
+	  printf("get <%s>\n", filename);
+	}else if(errno !=0){
+	  perror("scanf");
+	}else{
+	  fprintf(stderr, "No matching characters\n");
+	}
+      }else if(!strncmp(bufread, "share", 5)){
+	if((nmatch = sscanf(bufread, "share %s %s", filename, otherhost)) == 2){
+	  printf("get <%s> <%s>\n", filename, otherhost);
+	}else if(errno !=0){
+	  perror("scanf");
+	}else{
+	  fprintf(stderr, "No matching characters\n");
+	}
+      }else if(!strncmp(bufread, "list", 4)){
+	ndir = scandir(".", &namelist, 0, alphasort);
+	if (ndir < 0)
+	  perror("scandir");
+	else {
+	  while (ndir--) {
+	    printf("%s\n", namelist[ndir]->d_name);
+	    free(namelist[ndir]);
+	  }
+	  free(namelist);
+	}
+      }else if(!strncmp(bufread, "quit", 4)){
+	;
+      }else{
+	printf("invalid command: %s\n", bufread); /* ignore ivalid command*/
+      }
+
+      FD_CLR(fileno(stdin), &rmask);
+    }
+
     if (FD_ISSET(request_sock, &rmask)) {
       /* a new connection is available on the connetion socket */
       addrlen = sizeof(remote);
@@ -200,13 +261,14 @@ char *argv[];
 	      if ((tok = strtok(NULL, DELIMITER))){
 		ip = tok;
 		if ((tok = strtok(NULL, DELIMITER))){
-		  filename = tok;
+		  //filename = tok;
+		  strcpy(filename, tok);
 		  printf("get from (%hu, %s), file=<%s>\n", 
 			 port, ip, filename);
 
 
-		  /*try to read the file in cwd*/
-		  strcpy(path, cwd);
+		  /*try to read the file in sharedir*/
+		  strcpy(path, sharedir);
 		  strcat(path, filename);
 		  printf("Opening <%s>...\n", path);
 		  if(!(fp = fopen(path, "r"))){
