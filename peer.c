@@ -39,7 +39,7 @@ char *argv[];
   char *filename;
 
   char cwd[256];
-  char *path;
+  char path[256];
 
   FILE *fp;
 
