@@ -35,8 +35,8 @@ char *argv[];
 
   printf("peer: fork successed.\n");
 
-  if((argc !=4) && (argc != 5)) {
-    (void) fprintf(stderr,"usage: %s remoteport remoteip cmd (cmd2)\n",
+  if((argc !=4) && (argc != 3)) {
+    (void) fprintf(stderr,"usage: %s host cmd (cmd2)\n",
 		   argv[0]);
     exit(1);
   }
@@ -48,8 +48,8 @@ char *argv[];
 	   argv[3]);
 
   }else {
-    printf("in child process exec: <%s> <%s> <%s> <%s> <%s>\n",
-	   argv[0], argv[1], argv[2], argv[3], argv[4]);
+    printf("in child process exec: <%s> <%s> <%s>\n",
+	   argv[0], argv[1], argv[2]);
   }
   
   if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
@@ -77,7 +77,8 @@ char *argv[];
   FD_SET(sock, &mask);
   /* this messenger will not listen to keyboard input*/
   //  FD_SET(fileno(stdin), &mask); 
-  for (;;) {
+
+  for(;;) {
     rmask = mask;
     nfound = select(FD_SETSIZE, &rmask, (fd_set *)0, (fd_set *)0, &timeout);
     if (nfound < 0) {
@@ -99,6 +100,9 @@ char *argv[];
       bytesread = read(sock, bufread, sizeof(bufread));
       bufread[bytesread] = '\0';
       printf("%s: got %d bytes (%d, %d): %s\n", argv[0], bytesread, (int)sizeof(bufread), (int)strlen(bufread), bufread);
+      if(!strncmp(bufread,"close", 5)) /*if the server tear the conn */
+	break;
+
       if((tok = strtok(bufread, DELIMITER))){
 	if(!strcmp(tok, "ip")){ /* msg format: "ip xxx.xxx.xxx.xxx" */
 	  if ((tok = strtok(NULL, DELIMITER))){
@@ -152,4 +156,5 @@ char *argv[];
       }
     }
   }
+  return 0;
 } /* main - client.c */

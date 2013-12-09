@@ -24,7 +24,8 @@ char *argv[];
   struct sockaddr_in server, remote;
 
   char *ip;
-  unsigned short port;
+  //  unsigned short port; /* we use the macro P2PSERV in const.h */
+
 
   int request_sock, new_sock;
   int nfound, fd, maxfd, bytesread, nmatch, ndir, i;
@@ -183,13 +184,15 @@ char *argv[];
       }else if(!strncmp(bufread, "share", 5)){
 	if((nmatch = sscanf(bufread, "share %s %s", filename, otherhost)) == 2){
 	  printf("share <%s> <%s>\n", filename, otherhost);
+	  printf("before fork\n");
 	  if((pid = fork())<0){
 	    perror("fork");
 	    exit(-1);
 	  }
+	  printf("after fork\n");
 	  if(pid ==0){
 	    if(execl("messenger", "messenger",
-		     inet_ntoa(ptr->addr),
+		     otherhost,
 		     "push", filename, NULL)<0){
 	      perror("execl");
 	      exit(-1);
@@ -313,69 +316,72 @@ char *argv[];
 
 	msg[bytesread] = '\0';
 	
-	//printf("\n\n%s: %d bytes from %d (%hu, %s): %s\n",
-	//       argv[0], bytesread, fd, port, ip, msg);
+	printf("\n\n%s: %d bytes from %d: %s\n",
+	       argv[0], bytesread, fd, msg);
 
 	if((tok = strtok(msg, DELIMITER))){
-	  /* msg format: "reg port xxx.xxx.xxx.xxx" */
+	  /* msg format: "reg host" */
 	  if(!strcmp(tok, "reg")){
 	    if ((tok = strtok(NULL, DELIMITER))){
-	      port = atoi(tok);
-	      if ((tok = strtok(NULL, DELIMITER))){
-		ip = tok;
-		printf("reg from (%hu, %s)\n", port, ip);
-		peerlistinsert(peerlistp, port, ip);
-		//peerlistprint(peerlistp);
-	      }
+	      ip = tok;
+	      printf("reg from %s\n", ip);
+	      peerlistinsert(peerlistp, P2PSERV, ip);
+	      //peerlistprint(peerlistp);
 	    }
-	  }else if (!strcmp(tok, "get")){ /* "get port ip filename " */
+	    if(write(fd, "close", 5) !=5){
+	      perror("write");
+	      exit(-1);
+	    }
+	  }else if (!strcmp(tok, "get")){ /*"get host filename"*/
 	    if ((tok = strtok(NULL, DELIMITER))){
-	      port = atoi(tok);
+	      ip = tok;
 	      if ((tok = strtok(NULL, DELIMITER))){
-		ip = tok;
-		if ((tok = strtok(NULL, DELIMITER))){
-		  //filename = tok;
-		  strcpy(filename, tok);
-		  printf("get from (%hu, %s), file=<%s>\n", 
-			 port, ip, filename);
+		//filename = tok;
+		strcpy(filename, tok);
+		printf("get from %s, file=<%s>\n", 
+		       ip, filename);
 
-
-		  /*try to read the file in sharedir*/
-		  strcpy(path, sharedir);
-		  strcat(path, filename);
-		  printf("Opening <%s>...\n", path);
-		  if(!(fp = fopen(path, "r"))){
-		    if(errno == ENOENT){//if this file does not exist
-		      //todo forward to other neighbors
-		      for(ptr = peerlistp->head; ptr; ptr = ptr->next){
-			pid = fork();
-			if (pid == 0){
-			  sprintf(portstr, "%hu", ptr->port);
-			  printf("in child process pid = %d, <%s>, <%s>\n", 
-				 pid, portstr, inet_ntoa(ptr->addr));
-			  if (execl("client", "client",  
-				    portstr, inet_ntoa(ptr->addr), bufread,
-				    NULL) < 0){
-			    perror("execl");
-			    exit(-1);
-			  }
+		/*try to read the file in sharedir*/
+		strcpy(path, sharedir);
+		strcat(path, filename);
+		printf("Opening <%s>...\n", path);
+		if(!(fp = fopen(path, "r"))){
+		  //		  printf("A");
+		  if(errno == ENOENT){//if this file does not exist
+		    //todo forward to other neighbors
+		    for(ptr = peerlistp->head; ptr; ptr = ptr->next){
+		      pid = fork();
+		      if (pid == 0){
+			sprintf(portstr, "%hu", ptr->port);
+			printf("in child process pid = %d, <%s>, <%s>\n", 
+			       pid, portstr, inet_ntoa(ptr->addr));
+			if (execl("client", "client",  
+				  portstr, inet_ntoa(ptr->addr), bufread,
+				  NULL) < 0){
+			  perror("execl");
+			  exit(-1);
 			}
 		      }
-		    }else{
-		      //perror("fopen");
-		      //exit(-1);
-		      ; /* for robustness, still working */
 		    }
 		  }else{
-		    //todo read the file and return it to the requester
-		    
-		    if(!fclose(fp)){
-		      perror("fclose");
-		      exit(-1);
-		    }
+		    perror("fopen");
+		    //exit(-1);
+		    ; /* for robustness, still working */
+		  }
+		}else{
+		  //todo read the file and return it to the requester
+		  printf("open <%s> sucessfully\n", path);
+		  if(fclose(fp)){
+		    perror("fclose");
+		    //		    exit(-1);
 		  }
 		}
+
 	      }
+	    }
+	    if(write(fd, "close", 5) !=5){
+	      perror("write");
+	      exit(-1);
 	    }
 	  }else{
 	    ;/* ignore illegal message here */
