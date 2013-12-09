@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
+#include <time.h>
 
 int peerlistinit(struct peerlist* peerlistp){
   peerlistp->cnt = 0;
@@ -94,6 +94,25 @@ int peerlistsearch(struct peerlist* peerlistp,
   return 0;
 }
 
+
+/* return a randomly picked neighbor */
+/* if the list is empty, return NULL*/
+struct ipport* peerlistrand(struct peerlist* peerlistp){
+  int r, i;
+  struct ipport* ptr;
+  if(peerlistp->cnt == 0)
+    return NULL;
+  srand(time(NULL));
+  r = rand()%peerlistp->cnt;
+  for (ptr=peerlistp->head, i=0; i<r; ptr=ptr->next, i++)
+    ;
+  
+  printf("randomly pick %d-th nbr (%hu, %s)\n", 
+	 r, ptr->port, inet_ntoa(ptr->addr));
+  return ptr;
+}
+
+
 int peerlistprint(struct peerlist* peerlistp){
   struct ipport* ptr;
   printf("--dumping peerlist--\n");
@@ -135,6 +154,9 @@ int ipportprint(struct ipport* ipportp){
   printf("(%hu, %s)\n", ipportp->port, inet_ntoa(ipportp->addr));
   return 0;
 }
+
+
+
 
 /* char* ipport2str(struct ipport* ipportp){ */
 /*   char buf[64]; */

@@ -246,6 +246,21 @@ char *argv[];
 	      printf("sent msg to <%s>: <%s>\n", 
 		     argv[1], bufwrite);
 	      break;
+
+	    }else if(!strcmp(argv[2], "nbr")){
+	      bzero(bufwrite, sizeof(bufwrite));
+	      sprintf(bufwrite, "nbr%s%s",
+		      DELIMITER, argv[3]);
+
+	      if(write(sock, bufwrite, strlen(bufwrite)) != 
+		 strlen(bufwrite)){
+		perror("nbr");
+		exit(-1);
+	      }
+	  
+	      break;
+
+
 	    }else{/* unrecognized arg[3] msg */
 	      (void) fprintf(stderr,"invalid arg[3] format <%s>\n",
 			     argv[2]);

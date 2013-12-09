@@ -8,52 +8,70 @@
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <fcntl.h>
+#include "peerlist.h"
 #include <stdlib.h>
 #include <string.h>
+#include "const.h"
+#include <dirent.h>
+
+
 
 int main(argc, argv)
 int argc;
 char *argv[];
 {
-  struct servent *servp;
   struct sockaddr_in server, remote;
+
+  char *ip;
+
+
   int request_sock, new_sock;
   int nfound, fd, maxfd, bytesread;
+  int pid;
   unsigned addrlen;
   fd_set rmask, mask;
   static struct timeval timeout = { 0, 500000 }; /* one half second */
-  char buf[BUFSIZ];
-  if (argc != 2) {
-    (void) fprintf(stderr,"usage: %s service\n",argv[0]);
-    exit(1);
-  }
+  char bufread[BUFSIZ];
+  char bufwrite[BUFSIZ];
+  char msg[BUFSIZ];
+
+  //  char portstr[6]; /* max port num: 65535*/
+
+  char *tok;
+
+  struct ipport* ptr;
+  
+
+  /* neighbor list */
+  struct peerlist apeerlist, *peerlistp = &apeerlist;
+  peerlistinit(peerlistp);
+
+
   if ((request_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
     perror("socket");
     exit(1);
   }
-  if (isdigit(argv[1][0])) {
-    static struct servent s;
-    servp = &s;
-    s.s_port = htons((u_short)atoi(argv[1]));
-  } else if ((servp = getservbyname(argv[1], "tcp")) == 0) {
-    fprintf(stderr,"%s: unknown service\n", argv[1]);
-    exit(1);
-  }
+
+
   bzero((void *) &server, sizeof server);
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = servp->s_port;
+
+  server.sin_port = htons(P2PSERV);
   if (bind(request_sock, (struct sockaddr *)&server, sizeof server) < 0) {
     perror("bind");
     exit(1);
   }
+
   if (listen(request_sock, SOMAXCONN) < 0) {
     perror("listen");
     exit(1);
   }
+
+
   FD_ZERO(&mask);
   FD_SET(request_sock, &mask);
+
   maxfd = request_sock;
   for (;;) {
     rmask = mask;
@@ -72,6 +90,8 @@ char *argv[];
       //      printf("."); fflush(stdout);
       continue;
     }
+
+
     if (FD_ISSET(request_sock, &rmask)) {
       /* a new connection is available on the connetion socket */
       addrlen = sizeof(remote);
@@ -84,6 +104,17 @@ char *argv[];
       printf("connection from host %s, port %d, socket %d\n",
 	     inet_ntoa(remote.sin_addr), ntohs(remote.sin_port),
 	     new_sock);
+
+      /* echo IP. the host itself doesn't know its IP.*/
+      sprintf(bufwrite, "ip%s%s", DELIMITER, inet_ntoa(remote.sin_addr));
+
+      /* if (write(new_sock, "ip", 3) != 3) */
+      /* 	perror("ip"); */
+
+      if (write(new_sock, bufwrite, strlen(bufwrite)) != strlen(bufwrite))
+	perror("echoip");
+      printf("bufwrite <%s>, %d written\n", bufwrite, (int)strlen(bufwrite));
+
       FD_SET(new_sock, &mask);
       if (new_sock > maxfd)
 	maxfd = new_sock;
@@ -93,7 +124,7 @@ char *argv[];
       /* look for other sockets that have data available */
       if (FD_ISSET(fd, &rmask)) {
 	/* process the data */
-	bytesread = read(fd, buf, sizeof buf - 1);
+	bytesread = read(fd, bufread, sizeof bufread - 1);
 	if (bytesread<0) {
 	  perror("read");
 	  /* fall through */
@@ -104,13 +135,57 @@ char *argv[];
 	  if (close(fd)) perror("close");
 	  continue;
 	}
-	buf[bytesread] = '\0';
-	printf("%s: %d bytes from %d: %s\n",
-	       argv[0], bytesread, fd, buf);
-	/* echo it back */
-	if (write(fd, buf, bytesread)!=bytesread)
+
+	strcpy(msg, bufread); /* make a copy, not to destroy the read buf*/
+
+	addrlen = sizeof(remote);
+	if(getsockname(fd, (struct sockaddr*)&remote, &addrlen)<0){
+	  perror("getsockname");
+	  exit(-1);
+	}
+
+	//ip = inet_ntoa(remote.sin_addr);
+	//port = ntohs(remote.sin_port);
+
+	
+
+	msg[bytesread] = '\0';
+	
+	printf("\n\n%s: %d bytes from %d: %s\n",
+	       argv[0], bytesread, fd, msg);
+
+	if((tok = strtok(msg, DELIMITER))){
+	  /* msg format: "reg host" */
+	  if(!strcmp(tok, "reg")){
+	    if ((tok = strtok(NULL, DELIMITER))){
+	      ip = tok;
+	      printf("reg from %s\n", ip);
+	      ptr = peerlistrand(peerlistp);
+	      peerlistinsert(peerlistp, P2PSERV, ip);
+	      if(ptr){/*if nbr exists, randomly pick one to reply */
+		if((pid = fork())<0){
+		  perror("fork");
+		  exit(-1);
+		}
+		if(pid == 0){
+		  /* msg format: nbr nbrip */
+		  if(execl("messenger", "messenger", ip, 
+			   "nbr", inet_ntoa(ptr->addr),  NULL)<0){
+		    perror("execl");
+		    exit(-1);
+		  }
+		}
+	      }
+	    }
+	  }else {
+	    ;/* ignore illegal message here */
+	  }
+	}
+
+	if (write(fd, bufread, bytesread)!=bytesread)
 	  perror("echo");
       }
     }
   }
 } /* main - server.c */
+

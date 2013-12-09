@@ -26,6 +26,7 @@ char *argv[];
   char *ip;
   char *lastip;
   char *originip;
+  char *nbrip;
   //  unsigned short port; /* we use the macro P2PSERV in const.h */
 
 
@@ -70,14 +71,6 @@ char *argv[];
     exit(1);
   }
 
-  /* if (isdigit(argv[2][0])) { */
-  /*   static struct servent s; */
-  /*   servp = &s; */
-  /*   s.s_port = htons((u_short)atoi(argv[2])); */
-  /* } else if ((servp = getservbyname(argv[2], "tcp")) == 0) { */
-  /*   fprintf(stderr,"%s: unknown service\n", argv[2]); */
-  /*   exit(1); */
-  /*} */
   bzero((void *) &server, sizeof server);
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = INADDR_ANY;
@@ -97,27 +90,19 @@ char *argv[];
 
   printf("shared dir set to %s\n", sharedir);
 
-  /* if(!getcwd(sharedir, 256)){ */
-  /*   perror(sharedir); */
-  /*   exit(-1); */
-  /* } */
-
-  /* if ((pid = fork()) < 0){ */
-  /*   perror("fork"); */
-  /*   exit(1); */
-  /* } */
-
-  /* printf("%s %s pid=%d\n", argv[2], argv[3], pid); */
-
-  /* if (pid == 0){ */
-  /*   printf("This is the child process\n"); */
-  /*   if (execl("client", "client",  argv[2], argv[3], NULL) < 0){ */
-  /*     perror("execl"); */
-  /*     exit(-1); */
-  /*   } */
-  /* } */
-  
-  /* printf("This is the parent process, %s, %s\n", argv[1], argv[2]); */
+  /* register to the central server*/
+  if((pid = fork())<0){
+    perror("fork");
+    exit(-1);
+  }
+  if(pid ==0){
+    if(execl("messenger", "messenger",
+	     argv[2],
+	     "reg", NULL)<0){
+      perror("execl");
+      exit(-1);
+    }
+  }
 
   FD_ZERO(&mask);
   FD_SET(request_sock, &mask);
@@ -454,6 +439,24 @@ char *argv[];
 
 		if(fclose(fp)){
 		  perror("fclose");
+		  exit(-1);
+		}
+	      }
+	    }
+	  }else if (!strcmp(tok, "nbr")){
+	    if ((tok = strtok(NULL, DELIMITER))){
+	      nbrip = tok;
+	      peerlistinsert(peerlistp, P2PSERV, nbrip);
+	      if((pid = fork()) < 0){
+		perror("fork");
+		exit(-1);
+	      };
+	      if(pid == 0){
+		printf("reg to <%s>\n", nbrip);
+		if(execl("messenger", "messenger", 
+			 nbrip, /* nbr ip */
+			 "reg", NULL) <0){ /* msg to nbr */
+		  perror("execel");
 		  exit(-1);
 		}
 	      }

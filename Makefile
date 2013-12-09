@@ -1,6 +1,9 @@
 all: server client central-server peer messenger #testpeerlist
-central-server : central-server.c const.h
-	gcc  -Wall -Werror -lnsl central-server.c -o central-server
+central-server : central-server.o peerlist.o
+	gcc  -Wall -Werror central-server.o peerlist.o \
+	-o central-server
+central-server.o : central-server.c const.h
+	gcc  -c -Wall -Werror -lnsl central-server.c
 peer : peer.o peerlist.o
 	gcc  -Wall -Werror peer.o peerlist.o -o peer
 peer.o : peer.c const.h
