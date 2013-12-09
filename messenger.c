@@ -132,8 +132,9 @@ char *argv[];
 
 	      break;
 	    }else if(!strcmp(argv[2], "get")){/* get filename */
-	      /* msg format: "get xxx.xxx.xxx.xxx filename "*/
-	      sprintf(bufwrite, "get%s%s%s%s",
+	      /* msg format: "get lastip originip filename "*/
+	      sprintf(bufwrite, "get%s%s%s%s%s%s",
+		      DELIMITER, localaddr,
 		      DELIMITER, localaddr,
 		      DELIMITER, argv[3]);
 	      printf("sending msg to <%s>: <%s>...\n", 
@@ -141,7 +142,7 @@ char *argv[];
 
 	      if(write(sock, bufwrite, strlen(bufwrite)) != 
 		 strlen(bufwrite)){
-		perror("reg");
+		perror("get");
 		exit(-1);
 	      }
 
@@ -149,18 +150,19 @@ char *argv[];
 		     argv[1], bufwrite);
 	      break;
 	    }else if(!strcmp(argv[2], "fwd")){
-	      strcpy(bufwrite, "get");
-	      strcat(bufwrite, &argv[2][3]); /*replace "fwd" with "get" */
-	      printf("sending msg to <%s>: <%s>...\n", 
+
+	      sprintf(bufwrite, "get%s%s%s", 
+		      DELIMITER, localaddr, argv[3]);
+	      printf("fwding msg to <%s>: <%s>...\n", 
 		     argv[1], bufwrite);
 
 	      if(write(sock, bufwrite, strlen(bufwrite)) != 
 		 strlen(bufwrite)){
-		perror("reg");
+		perror("fwd");
 		exit(-1);
 	      }
 
-	      printf("sent msg to <%s>: <%s>\n", 
+	      printf("fwded msg to <%s>: <%s>\n", 
 		     argv[1], bufwrite);
 
 	      break;
@@ -178,7 +180,7 @@ char *argv[];
 
 	      if(write(sock, bufwrite, strlen(bufwrite)) != 
 		 strlen(bufwrite)){
-		perror("reg");
+		perror("push");
 		exit(-1);
 	      }
 

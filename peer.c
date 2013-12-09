@@ -24,6 +24,8 @@ char *argv[];
   struct sockaddr_in server, remote;
 
   char *ip;
+  char *lastip;
+  char *originip;
   //  unsigned short port; /* we use the macro P2PSERV in const.h */
 
 
@@ -38,7 +40,7 @@ char *argv[];
   char bufwrite[BUFSIZ];
   char msg[BUFSIZ];
 
-  char portstr[6]; /* max port num: 65535*/
+  //  char portstr[6]; /* max port num: 65535*/
 
   char *tok;
   char filename[256];
@@ -193,6 +195,7 @@ char *argv[];
 	  printf("after fork\n");
 	  if(pid ==0){
 	    strcpy(path, sharedir);
+	    strcat(path, "/");
 	    strcat(path, filename);
 	    if(execl("messenger", "messenger",
 		     otherhost,
@@ -208,7 +211,7 @@ char *argv[];
 	  fprintf(stderr, "No matching characters\n");
 	}
       }else if(!strncmp(bufread, "list", 4)){
-	ndir = scandir(".", &namelist, 0, alphasort);
+	ndir = scandir(sharedir, &namelist, 0, alphasort);
 	if (ndir < 0)
 	  perror("scandir");
 	else {
@@ -252,11 +255,30 @@ char *argv[];
 	    exit(-1);
 	  }
 	}
-
+      }else if(!strncmp(bufread, "reg", 3)){
+	if((nmatch = sscanf(bufread, "reg %s", otherhost)) == 1){
+	  printf("reg <%s>\n", otherhost);
+	  if((pid = fork())<0){
+	    perror("fork");
+	    exit(-1);
+	  }
+	  if(pid ==0){
+	    if(execl("messenger", "messenger",
+		     otherhost,
+		     "reg", NULL)<0){
+	      perror("execl");
+	      exit(-1);
+	    }
+	  }
+	  
+	}else if(errno !=0){
+	  perror("scanf");
+	}else{
+	  fprintf(stderr, "No matching characters\n");
+	}
       }else{
 	printf("invalid command: %s\n", bufread); /* ignore invalid command*/
       }
-
       FD_CLR(fileno(stdin), &rmask);
     }
 
@@ -335,46 +357,64 @@ char *argv[];
 	    /*   perror("write"); */
 	    /*   exit(-1); */
 	    /* } */
-	  }else if (!strcmp(tok, "get")){ /*"get host filename"*/
+	  }else if (!strcmp(tok, "get")){ 
+	    /* msg format: "get lastip originip filename "*/
 	    if ((tok = strtok(NULL, DELIMITER))){
-	      ip = tok;
+	      lastip = tok;
 	      if ((tok = strtok(NULL, DELIMITER))){
-		//filename = tok;
-		strcpy(filename, tok);
-		printf("get from %s, file=<%s>\n", 
-		       ip, filename);
+		originip = tok;
+		if ((tok = strtok(NULL, DELIMITER))){
+		  //filename = tok;
+		  strcpy(filename, tok);
+		  printf("get from <%s>, <%s> requests file=<%s>\n", 
+			 lastip, originip, filename);
 
-		/*try to read the file in sharedir*/
-		strcpy(path, sharedir);
-		strcat(path, filename);
+		  /*try to read the file in sharedir*/
+		  strcpy(path, sharedir);
+		  strcat(path, "/");
+		  strcat(path, filename);
 
-		if(access(path, F_OK)){
-		  /*if does not exist*/
-		  for(ptr = peerlistp->head; ptr; ptr = ptr->next){
-		    pid = fork();
-		    if (pid == 0){
-		      sprintf(portstr, "%hu", ptr->port);
-		      printf("in child process pid = %d, <%s>, <%s>\n",
-			     pid, portstr, inet_ntoa(ptr->addr));
-		      if (execl("client", "client",
-				portstr, inet_ntoa(ptr->addr), bufread,
-				NULL) < 0){
+		  if(access(path, F_OK)){
+		    /*if does not exist*/
+		    bzero(bufwrite, sizeof(bufwrite));
+		    for(ptr = peerlistp->head; ptr; ptr = ptr->next){
+		      /* here we skip the nbr where the msg came*/
+		      if(!strcmp(lastip, inet_ntoa(ptr->addr)))
+			continue;
+		      if((pid = fork())<0){
+			perror("fork");
+			exit(-1);
+		      }
+		      if (pid == 0){
+			bzero(bufwrite, sizeof(bufwrite));
+			sprintf(bufwrite, "%s%s%s%s",
+				 DELIMITER, originip,
+				 DELIMITER, filename);
+		      
+			if (execl("messenger", "messenger",
+				  inet_ntoa(ptr->addr), 
+				  "fwd", bufwrite,
+				  NULL) < 0){
+			  perror("execl");
+			  exit(-1);
+			}
+		      }
+		    }
+		  }else{
+		    /* if file exists */
+		    if((pid = fork())<0){
+		      perror("fork");
+		      exit(-1);
+		    }
+		    if(pid == 0){
+		      strcpy(path, sharedir);
+		      strcat(path, "/");
+		      strcat(path, filename);
+		      if(!execl("messenger","messenger", 
+				originip, "push", path, NULL)){
 			perror("execl");
 			exit(-1);
 		      }
-		    }
-		  }
-		}else{
-		  /* if file exists */
-		  if((pid = fork())<0){
-		    perror("fork");
-		    exit(-1);
-		  }
-		  if(pid == 0){
-		    if(!execl("messenger","messenger", 
-			      ip, "push", filename, NULL)){
-		      perror("execl");
-		      exit(-1);
 		    }
 		  }
 		}
@@ -386,6 +426,7 @@ char *argv[];
 	      if ((tok = strtok(NULL, DELIMITER))){
 		size = atoi(tok);
 		strcpy(path, sharedir);
+		strcat(path, "/");
 		strcat(path, filename);
 		printf("try to create file <%s>\n", path);
 		if(!(fp = fopen(path, "w"))){
@@ -408,7 +449,7 @@ char *argv[];
 		    break;
 		}
 
-		printf("received file <%s>()%d byte\n", 
+		printf("received file <%s> (%d) byte\n", 
 		       filename, byterecv);
 
 		if(fclose(fp)){
