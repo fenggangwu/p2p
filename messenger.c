@@ -11,9 +11,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "const.h"
+#include <sys/stat.h>
+#include <libgen.h>
 
-
-/* format: ./client remoteport remortip cmd (cmd2)*/
+/* format: ./client host cmd (cmd2)*/
 int main(argc, argv)
 int argc;
 char *argv[];
@@ -26,12 +27,16 @@ char *argv[];
   fd_set rmask, /*xmask,*/ mask;
   char bufread[BUFSIZ];
   char bufwrite[BUFSIZ];
-
+  char buf[BUFSIZ]; /*for file transfer*/
   char localaddr[256];
 
-  int nfound, bytesread;
+  int nfound, bytesread, bytesent, n, size;
 
   char *tok;
+
+  struct stat st;
+
+  FILE *fp;
 
   printf("peer: fork successed.\n");
 
@@ -112,18 +117,112 @@ char *argv[];
 	    if(!strcmp(argv[2], "reg")){/*reg myport*/
 	      /* msg format: "reg xxx.xxx.xxx.xxx" */
 	      sprintf(bufwrite, "reg%s%s", DELIMITER, localaddr);
+
+	      printf("sending msg to <%s>: <%s>...\n", 
+		     argv[1], bufwrite);
+
+	      if(write(sock, bufwrite, strlen(bufwrite)) != 
+		 strlen(bufwrite)){
+		perror("reg");
+		exit(-1);
+	      }
+
+	      printf("sent msg to <%s>: <%s>\n", 
+		     argv[1], bufwrite);
+
+	      break;
 	    }else if(!strcmp(argv[2], "get")){/* get filename */
 	      /* msg format: "get xxx.xxx.xxx.xxx filename "*/
 	      sprintf(bufwrite, "get%s%s%s%s",
 		      DELIMITER, localaddr,
 		      DELIMITER, argv[3]);
+	      printf("sending msg to <%s>: <%s>...\n", 
+		     argv[1], bufwrite);
+
+	      if(write(sock, bufwrite, strlen(bufwrite)) != 
+		 strlen(bufwrite)){
+		perror("reg");
+		exit(-1);
+	      }
+
+	      printf("sent msg to <%s>: <%s>\n", 
+		     argv[1], bufwrite);
+	      break;
 	    }else if(!strcmp(argv[2], "fwd")){
 	      strcpy(bufwrite, "get");
 	      strcat(bufwrite, &argv[2][3]); /*replace "fwd" with "get" */
+	      printf("sending msg to <%s>: <%s>...\n", 
+		     argv[1], bufwrite);
+
+	      if(write(sock, bufwrite, strlen(bufwrite)) != 
+		 strlen(bufwrite)){
+		perror("reg");
+		exit(-1);
+	      }
+
+	      printf("sent msg to <%s>: <%s>\n", 
+		     argv[1], bufwrite);
+
+	      break;
+
 	    }else if(!strcmp(argv[2], "push")){
-	      sprintf(bufwrite, "push%s%s%s%s",
-		      DELIMITER, localaddr,
-		      DELIMITER, argv[3]);
+	      stat(argv[3], &st);
+	      size = st.st_size;
+	      /* msg format: push file.txt size_in_byte*/
+	      sprintf(bufwrite, "push%s%s%s%d",
+		      DELIMITER, basename(argv[3]),
+		      DELIMITER, size);
+	      
+	      printf("sending msg to <%s>: <%s>...\n", 
+		     argv[1], bufwrite);
+
+	      if(write(sock, bufwrite, strlen(bufwrite)) != 
+		 strlen(bufwrite)){
+		perror("reg");
+		exit(-1);
+	      }
+
+	      printf("sent msg to <%s>: <%s>\n", 
+		     argv[1], bufwrite);
+
+
+	      /*file transfer starts */
+
+	      printf("Opening <%s>...\n", argv[3]);
+	      if(!(fp = fopen(argv[3], "r"))){
+		perror("fopen");
+		exit(-1);
+	      }
+	      else{
+		//todo read the file and return it to the requester
+		printf("open <%s> sucessfully\n", argv[3]);
+
+		bytesent = 0;
+		bzero(buf, sizeof(buf));
+		while((n=fread(buf, sizeof(char), BUFSIZ, fp)) > 0){
+		  if(write(sock, buf, n) != n){
+		    perror("write");
+		    exit(-1);
+		  }
+		  bzero(buf, sizeof(buf));
+		  bytesent += n;
+		}
+
+		printf("file %s (%d bytes) sent\n", 
+		       argv[3], bytesent);
+
+		if(fclose(fp)){
+		  perror("fclose");
+		  //		    exit(-1);
+		}
+	      }
+
+
+
+	      /*file transfer ends */
+
+
+	      break;
 	    }else if(!strcmp(argv[2], "quit")){
 	      if(argc == 4){
 		sprintf(bufwrite, "quit%s%s%s%s",
@@ -132,29 +231,34 @@ char *argv[];
 	      }else{
 		sprintf(bufwrite, "quit%s%s", DELIMITER, localaddr);
 	      }
+
+	      printf("sending msg to <%s>: <%s>...\n", 
+		     argv[1], bufwrite);
+
+	      if(write(sock, bufwrite, strlen(bufwrite)) != 
+		 strlen(bufwrite)){
+		perror("reg");
+		exit(-1);
+	      }
+
+	      printf("sent msg to <%s>: <%s>\n", 
+		     argv[1], bufwrite);
+	      break;
 	    }else{/* unrecognized arg[3] msg */
 	      (void) fprintf(stderr,"invalid arg[3] format <%s>\n",
 			     argv[2]);
 	      exit(1);
 	    }
-
-	    printf("sending msg to <%s>: <%s>...\n", 
-		   argv[1], bufwrite);
-
-	    if(write(sock, bufwrite, strlen(bufwrite)) != 
-		 strlen(bufwrite)){
-		perror("reg");
-		exit(-1);
-	    }
-
-	    printf("sent msg to <%s>: <%s>\n", 
-		   argv[1], bufwrite);
 	  }
 	}else{
 	  ; /*ignore the message comming other than "ip XX.XXX.XXX.XXX"*/
 	}
       }
     }
+  }
+  if(close(sock)){
+    perror("sock");
+    exit(-1);
   }
   return 0;
 } /* main - client.c */

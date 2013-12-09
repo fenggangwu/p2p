@@ -29,6 +29,7 @@ char *argv[];
 
   int request_sock, new_sock;
   int nfound, fd, maxfd, bytesread, nmatch, ndir, i;
+  int size, n, byterecv;
   unsigned addrlen;
   fd_set rmask, mask;
   int pid;
@@ -191,9 +192,11 @@ char *argv[];
 	  }
 	  printf("after fork\n");
 	  if(pid ==0){
+	    strcpy(path, sharedir);
+	    strcat(path, filename);
 	    if(execl("messenger", "messenger",
 		     otherhost,
-		     "push", filename, NULL)<0){
+		     "push", path, NULL)<0){
 	      perror("execl");
 	      exit(-1);
 	    }
@@ -328,10 +331,10 @@ char *argv[];
 	      peerlistinsert(peerlistp, P2PSERV, ip);
 	      //peerlistprint(peerlistp);
 	    }
-	    if(write(fd, "close", 5) !=5){
-	      perror("write");
-	      exit(-1);
-	    }
+	    /* if(write(fd, "close", 5) !=5){ */
+	    /*   perror("write"); */
+	    /*   exit(-1); */
+	    /* } */
 	  }else if (!strcmp(tok, "get")){ /*"get host filename"*/
 	    if ((tok = strtok(NULL, DELIMITER))){
 	      ip = tok;
@@ -344,46 +347,77 @@ char *argv[];
 		/*try to read the file in sharedir*/
 		strcpy(path, sharedir);
 		strcat(path, filename);
-		printf("Opening <%s>...\n", path);
-		if(!(fp = fopen(path, "r"))){
-		  //		  printf("A");
-		  if(errno == ENOENT){//if this file does not exist
-		    //todo forward to other neighbors
-		    for(ptr = peerlistp->head; ptr; ptr = ptr->next){
-		      pid = fork();
-		      if (pid == 0){
-			sprintf(portstr, "%hu", ptr->port);
-			printf("in child process pid = %d, <%s>, <%s>\n", 
-			       pid, portstr, inet_ntoa(ptr->addr));
-			if (execl("client", "client",  
-				  portstr, inet_ntoa(ptr->addr), bufread,
-				  NULL) < 0){
-			  perror("execl");
-			  exit(-1);
-			}
+
+		if(access(path, F_OK)){
+		  /*if does not exist*/
+		  for(ptr = peerlistp->head; ptr; ptr = ptr->next){
+		    pid = fork();
+		    if (pid == 0){
+		      sprintf(portstr, "%hu", ptr->port);
+		      printf("in child process pid = %d, <%s>, <%s>\n",
+			     pid, portstr, inet_ntoa(ptr->addr));
+		      if (execl("client", "client",
+				portstr, inet_ntoa(ptr->addr), bufread,
+				NULL) < 0){
+			perror("execl");
+			exit(-1);
 		      }
 		    }
-		  }else{
-		    perror("fopen");
-		    //exit(-1);
-		    ; /* for robustness, still working */
 		  }
 		}else{
-		  //todo read the file and return it to the requester
-		  printf("open <%s> sucessfully\n", path);
-		  if(fclose(fp)){
-		    perror("fclose");
-		    //		    exit(-1);
+		  /* if file exists */
+		  if((pid = fork())<0){
+		    perror("fork");
+		    exit(-1);
+		  }
+		  if(pid == 0){
+		    if(!execl("messenger","messenger", 
+			      ip, "push", filename, NULL)){
+		      perror("execl");
+		      exit(-1);
+		    }
 		  }
 		}
-
 	      }
 	    }
-	    if(write(fd, "close", 5) !=5){
-	      perror("write");
-	      exit(-1);
+	  }else if (!strcmp(tok, "push")){
+	    if ((tok = strtok(NULL, DELIMITER))){
+	      strcpy(filename, tok);
+	      if ((tok = strtok(NULL, DELIMITER))){
+		size = atoi(tok);
+		strcpy(path, sharedir);
+		strcat(path, filename);
+		printf("try to create file <%s>\n", path);
+		if(!(fp = fopen(path, "w"))){
+		  perror("fopen");
+		  exit(-1);
+		}
+
+		bzero(bufread, sizeof(bufread));
+		byterecv = 0;
+		while((n = read(fd, bufread, sizeof(bufread)))>0){
+		  if(n != fwrite(bufread, sizeof(char), n, fp)){
+		    perror("fwrite");
+		    exit(-1);
+		  }
+		    
+
+		  bzero(bufread, sizeof(bufread));
+		  byterecv += n;
+		  if (byterecv >=  size) 
+		    break;
+		}
+
+		printf("received file <%s>()%d byte\n", 
+		       filename, byterecv);
+
+		if(fclose(fp)){
+		  perror("fclose");
+		  exit(-1);
+		}
+	      }
 	    }
-	  }else{
+	  }else {
 	    ;/* ignore illegal message here */
 	  }
 	}
