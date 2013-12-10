@@ -73,12 +73,14 @@ char *argv[];
   FD_SET(request_sock, &mask);
 
   maxfd = request_sock;
+
+  puts("central-server listening ...");
   for (;;) {
     rmask = mask;
     nfound = select(maxfd+1, &rmask, (fd_set *)0, (fd_set *)0, &timeout);
     if (nfound < 0) {
       if (errno == EINTR) {
-	printf("interrupted system call\n");
+	//	printf("interrupted system call\n");
 	continue;
       }
       /* something is very wrong! */
@@ -101,9 +103,10 @@ char *argv[];
 	perror("accept");
 	exit(1);
       }
-      printf("connection from host %s, port %d, socket %d\n",
-	     inet_ntoa(remote.sin_addr), ntohs(remote.sin_port),
-	     new_sock);
+      /* printf("connection from host %s, port %d, socket %d\n", */
+      /* 	     inet_ntoa(remote.sin_addr), ntohs(remote.sin_port), */
+      /* 	     new_sock); */
+      printf("\n\nconnection from host %s\n", inet_ntoa(remote.sin_addr));
 
       /* echo IP. the host itself doesn't know its IP.*/
       sprintf(bufwrite, "ip%s%s", DELIMITER, inet_ntoa(remote.sin_addr));
@@ -113,7 +116,7 @@ char *argv[];
 
       if (write(new_sock, bufwrite, strlen(bufwrite)) != strlen(bufwrite))
 	perror("echoip");
-      printf("bufwrite <%s>, %d written\n", bufwrite, (int)strlen(bufwrite));
+      /* printf("bufwrite <%s>, %d written\n", bufwrite, (int)strlen(bufwrite)); */
 
       FD_SET(new_sock, &mask);
       if (new_sock > maxfd)
@@ -130,7 +133,7 @@ char *argv[];
 	  /* fall through */
 	}
 	if (bytesread<=0) {
-	  printf("server: end of file on %d\n",fd);
+	  //	  printf("server: end of file on %d\n",fd);
 	  FD_CLR(fd, &mask);
 	  if (close(fd)) perror("close");
 	  continue;
@@ -151,18 +154,17 @@ char *argv[];
 
 	msg[bytesread] = '\0';
 	
-	printf("\n\n%s: %d bytes from %d: %s\n",
-	       argv[0], bytesread, fd, msg);
+	/* printf("\n\n%s: %d bytes from %d: %s\n", */
+	/*        argv[0], bytesread, fd, msg); */
 
 	if((tok = strtok(msg, DELIMITER))){
 	  /* msg format: "reg host" */
 	  if(!strcmp(tok, "reg")){
 	    if ((tok = strtok(NULL, DELIMITER))){
 	      ip = tok;
-	      printf("reg from %s\n", ip);
 	      ptr = peerlistrand(peerlistp);
 	      n = peerlistinsert(peerlistp, P2PSERV, ip);
-	      printf("insert nbr success, %d nbrs now\n", peerlistp->cnt);
+	      //	      printf("%d neighbors now\n", peerlistp->cnt);
 	      if(ptr){/*if nbr exists, randomly pick one to reply */
 		if((pid = fork())<0){
 		  perror("fork");
@@ -181,9 +183,9 @@ char *argv[];
 	  }else if(!strcmp(tok, "quit")){
 	    if ((tok = strtok(NULL, DELIMITER))){
 	      ip = tok;
-	      printf("quit from %s\n", ip);
+	      //	      printf("quit from %s\n", ip);
 	      n = peerlistdelete(peerlistp, P2PSERV, ip);
-	      printf("delete nbr success, %d nbrs remains\n", n);
+	      //	      printf("%d nbrs remains\n", n);
 	    }
 	  }else {
 	    ;/* ignore illegal message here */

@@ -38,7 +38,7 @@ char *argv[];
 
   FILE *fp;
 
-  printf("peer: fork successed.\n");
+  //  printf("peer: fork successed.\n");
 
   if((argc !=4) && (argc != 3)) {
     (void) fprintf(stderr,"usage: %s host cmd (cmd2)\n",
@@ -47,15 +47,15 @@ char *argv[];
   }
 
   
-  if(argc == 4){
-    printf("in child process exec: <%s> <%s> <%s><%s>\n", 	 
-	   argv[0], argv[1], argv[2], 
-	   argv[3]);
+  /* if(argc == 4){ */
+  /*   printf("in child process exec: <%s> <%s> <%s><%s>\n", 	  */
+  /* 	   argv[0], argv[1], argv[2],  */
+  /* 	   argv[3]); */
 
-  }else {
-    printf("in child process exec: <%s> <%s> <%s>\n",
-	   argv[0], argv[1], argv[2]);
-  }
+  /* }else { */
+  /*   printf("in child process exec: <%s> <%s> <%s>\n", */
+  /* 	   argv[0], argv[1], argv[2]); */
+  /* } */
   
   if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
     perror("socket");
@@ -76,8 +76,6 @@ char *argv[];
     exit(1);
   }
 
-  printf("Client connected\n");
-
   FD_ZERO(&mask);
   FD_SET(sock, &mask);
   /* this messenger will not listen to keyboard input*/
@@ -88,7 +86,7 @@ char *argv[];
     nfound = select(FD_SETSIZE, &rmask, (fd_set *)0, (fd_set *)0, &timeout);
     if (nfound < 0) {
       if (errno == EINTR) {
-	printf("interrupted system call\n");
+	//	printf("interrupted system call\n");
 	continue;
       }
       /* something is very wrong! */
@@ -104,7 +102,7 @@ char *argv[];
       /* data from network */
       bytesread = read(sock, bufread, sizeof(bufread));
       bufread[bytesread] = '\0';
-      printf("%s: got %d bytes (%d, %d): %s\n", argv[0], bytesread, (int)sizeof(bufread), (int)strlen(bufread), bufread);
+      //      printf("%s: got %d bytes (%d, %d): %s\n", argv[0], bytesread, (int)sizeof(bufread), (int)strlen(bufread), bufread);
       if(!strncmp(bufread,"close", 5)) /*if the server tear the conn */
 	break;
 
@@ -118,8 +116,8 @@ char *argv[];
 	      /* msg format: "reg xxx.xxx.xxx.xxx" */
 	      sprintf(bufwrite, "reg%s%s", DELIMITER, localaddr);
 
-	      printf("sending msg to <%s>: <%s>...\n", 
-		     argv[1], bufwrite);
+	      /* printf("sending msg to <%s>: <%s>...\n",  */
+	      /* 	     argv[1], bufwrite); */
 
 	      if(write(sock, bufwrite, strlen(bufwrite)) != 
 		 strlen(bufwrite)){
@@ -127,8 +125,8 @@ char *argv[];
 		exit(-1);
 	      }
 
-	      printf("sent msg to <%s>: <%s>\n", 
-		     argv[1], bufwrite);
+	      /* printf("sent msg to <%s>: <%s>\n",  */
+	      /* 	     argv[1], bufwrite); */
 
 	      break;
 	    }else if(!strcmp(argv[2], "get")){/* get filename */
@@ -137,8 +135,8 @@ char *argv[];
 		      DELIMITER, localaddr,
 		      DELIMITER, localaddr,
 		      DELIMITER, argv[3]);
-	      printf("sending msg to <%s>: <%s>...\n", 
-		     argv[1], bufwrite);
+	      /* printf("sending msg to <%s>: <%s>...\n",  */
+	      /* 	     argv[1], bufwrite); */
 
 	      if(write(sock, bufwrite, strlen(bufwrite)) != 
 		 strlen(bufwrite)){
@@ -146,15 +144,15 @@ char *argv[];
 		exit(-1);
 	      }
 
-	      printf("sent msg to <%s>: <%s>\n", 
-		     argv[1], bufwrite);
+	      /* printf("sent msg to <%s>: <%s>\n",  */
+	      /* 	     argv[1], bufwrite); */
 	      break;
 	    }else if(!strcmp(argv[2], "fwd")){
 
 	      sprintf(bufwrite, "get%s%s%s", 
 		      DELIMITER, localaddr, argv[3]);
-	      printf("fwding msg to <%s>: <%s>...\n", 
-		     argv[1], bufwrite);
+	      /* printf("fwding msg to <%s>: <%s>...\n",  */
+	      /* 	     argv[1], bufwrite); */
 
 	      if(write(sock, bufwrite, strlen(bufwrite)) != 
 		 strlen(bufwrite)){
@@ -162,8 +160,8 @@ char *argv[];
 		exit(-1);
 	      }
 
-	      printf("fwded msg to <%s>: <%s>\n", 
-		     argv[1], bufwrite);
+	      /* printf("fwded msg to <%s>: <%s>\n",  */
+	      /* 	     argv[1], bufwrite); */
 
 	      break;
 
@@ -175,8 +173,8 @@ char *argv[];
 		      DELIMITER, basename(argv[3]),
 		      DELIMITER, size);
 	      
-	      printf("sending msg to <%s>: <%s>...\n", 
-		     argv[1], bufwrite);
+	      /* printf("sending msg to <%s>: <%s>...\n",  */
+	      /* 	     argv[1], bufwrite); */
 
 	      if(write(sock, bufwrite, strlen(bufwrite)) != 
 		 strlen(bufwrite)){
@@ -184,20 +182,20 @@ char *argv[];
 		exit(-1);
 	      }
 
-	      printf("sent msg to <%s>: <%s>\n", 
-		     argv[1], bufwrite);
+	      /* printf("sent msg to <%s>: <%s>\n",  */
+	      /* 	     argv[1], bufwrite); */
 
 
 	      /*file transfer starts */
 
-	      printf("Opening <%s>...\n", argv[3]);
+	      /* printf("Opening <%s>...\n", argv[3]); */
 	      if(!(fp = fopen(argv[3], "r"))){
 		perror("fopen");
 		exit(-1);
 	      }
 	      else{
 		//todo read the file and return it to the requester
-		printf("open <%s> sucessfully\n", argv[3]);
+		/* printf("open <%s> sucessfully\n", argv[3]); */
 
 		bytesent = 0;
 		bzero(buf, sizeof(buf));
@@ -234,8 +232,8 @@ char *argv[];
 		sprintf(bufwrite, "quit%s%s", DELIMITER, localaddr);
 	      }
 
-	      printf("sending msg to <%s>: <%s>...\n", 
-		     argv[1], bufwrite);
+	      /* printf("sending msg to <%s>: <%s>...\n",  */
+	      /* 	     argv[1], bufwrite); */
 
 	      if(write(sock, bufwrite, strlen(bufwrite)) != 
 		 strlen(bufwrite)){
@@ -243,8 +241,8 @@ char *argv[];
 		exit(-1);
 	      }
 
-	      printf("sent msg to <%s>: <%s>\n", 
-		     argv[1], bufwrite);
+	      /* printf("sent msg to <%s>: <%s>\n",  */
+	      /* 	     argv[1], bufwrite); */
 	      break;
 
 	    }else if(!strcmp(argv[2], "nbr")){

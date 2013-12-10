@@ -19,7 +19,7 @@
 void
 catch_alarm (int sig)
 {
-  puts("Time out for get!");
+  puts("time out: file not found");
   signal (sig, catch_alarm);
 }
 
@@ -122,7 +122,7 @@ char *argv[];
     nfound = select(maxfd+1, &rmask, (fd_set *)0, (fd_set *)0, &timeout);
     if (nfound < 0) {
       if (errno == EINTR) {
-	printf("interrupted system call\n");
+	//	printf("interrupted system call\n");
 	continue;
       }
       /* something is very wrong! */
@@ -149,16 +149,14 @@ char *argv[];
 
       /* eliminate tailing \n*/
       bufread[strlen(bufread)-1] = '\0';
-      printf("the input msg is: <%s>\n", bufread);
+      //      printf("the input msg is: <%s>\n", bufread);
 
       /* TODO parse the input command and process */
       errno = 0;
 
       if(!strncmp(bufread, "get", 3)){
 	if((nmatch = sscanf(bufread, "get %s", filename)) == 1){
-	  printf("get <%s>\n", filename);
-
-
+	  //  printf("get <%s>\n", filename);
 	  for(ptr = peerlistp->head; ptr; ptr = ptr->next){
 	    ipportprint(ptr);
 	    if((pid = fork()) < 0){
@@ -174,10 +172,10 @@ char *argv[];
 		exit(-1);
 	      }
 	    }
-	    if(pid)
-	      printf("peer: parent, fork successed.\n");
-	    else
-	      printf("peer: child, fork successed.\n");
+	    /* if(pid) */
+	    /*   printf("peer: parent, fork successed.\n"); */
+	    /* else */
+	    /*   printf("peer: child, fork successed.\n"); */
 	  }
 	  puts("schedule time, time out = 5 sec");
 	  alarm(5);
@@ -188,13 +186,10 @@ char *argv[];
 	}
       }else if(!strncmp(bufread, "share", 5)){
 	if((nmatch = sscanf(bufread, "share %s %s", filename, otherhost)) == 2){
-	  printf("share <%s> <%s>\n", filename, otherhost);
-	  printf("before fork\n");
 	  if((pid = fork())<0){
 	    perror("fork");
 	    exit(-1);
 	  }
-	  printf("after fork\n");
 	  if(pid ==0){
 	    strcpy(path, sharedir);
 	    strcat(path, "/");
@@ -238,9 +233,6 @@ char *argv[];
 	  }
 	}
 
-
-	printf("A\n");fflush(stdout);
-
 	strcpy(nbrlist, ""); /* init */
 	for(i=1, ptr=peerlistp->head; i < peerlistp->cnt; 
 	    i++, ptr=ptr->next){ /*stop before the last one*/
@@ -261,13 +253,12 @@ char *argv[];
 	  }
 	  strcat(nbrlist, inet_ntoa(ptr->addr));
 	}
-	printf("B\n");fflush(stdout);
+
 	if((pid = fork())<0){
 	  perror("fork");
 	  exit(-1);
 	}
 
-	printf("C\n");fflush(stdout);
 	if(pid ==0){
 	  if(execl("messenger", "messenger",
 		   inet_ntoa(ptr->addr),
@@ -277,16 +268,15 @@ char *argv[];
 	  }
 	}
 
-	printf("D\n");fflush(stdout);
 	if(close(request_sock)){
 	  perror("close");
 	  exit(-1);
 	}
-	printf("E\n");fflush(stdout);
+
 	return 0;/*quit from the program*/
+
       }else if(!strncmp(bufread, "reg", 3)){
 	if((nmatch = sscanf(bufread, "reg %s", otherhost)) == 1){
-	  printf("reg <%s>\n", otherhost);
 	  if((pid = fork())<0){
 	    perror("fork");
 	    exit(-1);
@@ -320,9 +310,10 @@ char *argv[];
 	perror("accept");
 	exit(1);
       }
-      printf("connection from host %s, port %d, socket %d\n",
-	     inet_ntoa(remote.sin_addr), ntohs(remote.sin_port),
-	     new_sock);
+      /* printf("connection from host %s, port %d, socket %d\n", */
+      /* 	     inet_ntoa(remote.sin_addr), ntohs(remote.sin_port), */
+      /* 	     new_sock); */
+      printf("\n\nconnection from host %s\n", inet_ntoa(remote.sin_addr));
 
       /* echo IP. the host itself doesn't know its IP.*/
       sprintf(bufwrite, "ip%s%s", DELIMITER, inet_ntoa(remote.sin_addr));
@@ -332,7 +323,7 @@ char *argv[];
 
       if (write(new_sock, bufwrite, strlen(bufwrite)) != strlen(bufwrite))
 	perror("echoip");
-      printf("bufwrite <%s>, %d written\n", bufwrite, (int)strlen(bufwrite));
+      //      printf("bufwrite <%s>, %d written\n", bufwrite, (int)strlen(bufwrite));
 
       FD_SET(new_sock, &mask);
       if (new_sock > maxfd)
@@ -349,7 +340,7 @@ char *argv[];
 	  /* fall through */
 	}
 	if (bytesread<=0) {
-	  printf("server: end of file on %d\n",fd);
+	  //	  printf("server: end of file on %d\n",fd);
 	  FD_CLR(fd, &mask);
 	  if (close(fd)) perror("close");
 	  continue;
@@ -374,15 +365,15 @@ char *argv[];
 
 	msg[bytesread] = '\0';
 	
-	printf("\n\n%s: %d bytes from %d: %s\n",
-	       argv[0], bytesread, fd, msg);
+	/* printf("\n\n%s: %d bytes from %d: %s\n", */
+	/*        argv[0], bytesread, fd, msg); */
 
 	if((tok = strtok(msg, DELIMITER))){
 	  /* msg format: "reg host" */
 	  if(!strcmp(tok, "reg")){
 	    if ((tok = strtok(NULL, DELIMITER))){
 	      ip = tok;
-	      printf("reg from %s\n", ip);
+	      /* printf("reg from %s\n", ip); */
 	      peerlistinsert(peerlistp, P2PSERV, ip);
 	      //peerlistprint(peerlistp);
 	    }
@@ -399,8 +390,8 @@ char *argv[];
 		if ((tok = strtok(NULL, DELIMITER))){
 		  //filename = tok;
 		  strcpy(filename, tok);
-		  printf("get from <%s>, <%s> requests file=<%s>\n", 
-			 lastip, originip, filename);
+		  /* printf("get from <%s>, <%s> requests file=<%s>\n",  */
+		  /* 	 lastip, originip, filename); */
 
 		  /*try to read the file in sharedir*/
 		  strcpy(path, sharedir);
@@ -462,7 +453,7 @@ char *argv[];
 		strcpy(path, sharedir);
 		strcat(path, "/");
 		strcat(path, filename);
-		printf("try to create file <%s>\n", path);
+		/* printf("try to create file <%s>\n", path); */
 		if(!(fp = fopen(path, "w"))){
 		  perror("fopen");
 		  exit(-1);
@@ -501,7 +492,7 @@ char *argv[];
 		exit(-1);
 	      };
 	      if(pid == 0){
-		printf("reg to <%s>\n", nbrip);
+		/* printf("reg to <%s>\n", nbrip); */
 		if(execl("messenger", "messenger", 
 			 nbrip, /* nbr ip */
 			 "reg", NULL) <0){ /* msg to nbr */

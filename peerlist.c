@@ -31,17 +31,17 @@ int peerlistinsert(struct peerlist* peerlistp,
   struct ipport* ipportp = (struct ipport*)malloc(sizeof(struct ipport));
   ipportset(ipportp, port, ip);  
 
-  printf("inserting (%hu, %s)...\n", port, ip);
+  //  printf("inserting (%hu, %s)...\n", port, ip);
 
   if(peerlistsearch(peerlistp, port, ip)){
-    printf("insert (%hu, %s) failed.\n", port, ip);
+    printf("insert (%s) failed. No. of nbrs: %d\n", ip, peerlistp->cnt);
     return -1;
   }
   ipportp->next = peerlistp->head;
   peerlistp->head = ipportp;
   peerlistp->cnt++;
 
-  printf("inserted (%hu, %s).\n", port, ip);
+  printf("inserted (%s). No. of nbrs: %d\n", ip, peerlistp->cnt);
   return peerlistp->cnt;
 }
 
@@ -50,7 +50,7 @@ int peerlistinsert(struct peerlist* peerlistp,
 int peerlistdelete(struct peerlist* peerlistp, 
 		   unsigned short port, char* ip){
   struct ipport *ptr, *prevptr;
-  printf("deleting (%hu, %s)...\n", port, ip);
+  //  printf("deleting (%hu, %s)...\n", port, ip);
   for(ptr=peerlistp->head, prevptr=NULL; ptr!=NULL; ptr=ptr->next){
     //    printf("ptr=%ld, prevptr=%ld\n", (long)ptr, (long)prevptr);
     //   ipportprint(ptr);
@@ -63,18 +63,18 @@ int peerlistdelete(struct peerlist* peerlistp,
       }else{
 	//	printf("elseclause\n");
 	prevptr->next = ptr->next;
-	ipportprint(ptr);
+	//	ipportprint(ptr);
 	//	printf("FlagA\n");
 	free(ptr);
 	//	printf("FlagB\n");
       }
       peerlistp->cnt --;
-      printf("deleted (%hu, %s).\n", port, ip);
+      printf("deleted (%s). No. of nbrs: %d\n", ip, peerlistp->cnt);
       return peerlistp->cnt;
     }
     prevptr = ptr;
   }
-  printf("delete (%hu, %s) failed.\n", port, ip);
+  printf("delete (%s) failed. No. of nbrs: %d\n", ip, peerlistp->cnt);
   return -1;
 }
 
@@ -83,14 +83,14 @@ int peerlistsearch(struct peerlist* peerlistp,
 		   unsigned short port, char* ip){
   struct ipport* ptr;
   for (ptr=peerlistp->head; ptr!=NULL; ptr=ptr->next){
-    printf("searching for (%hu, %s)\n",port, ip);
+    //    printf("searching for (%hu, %s)\n",port, ip);
     //    ipportprint(ptr);
     if (!ipportcompare2(ptr, port, ip)){
-      printf("search (%hu, %s) found\n", port, ip);
+      //      printf("search (%hu, %s) found\n", port, ip);
       return 1;
     }
   }
-  printf("search (%hu, %s) not found\n", port, ip);
+  //  printf("search (%hu, %s) not found\n", port, ip);
   return 0;
 }
 
@@ -107,8 +107,8 @@ struct ipport* peerlistrand(struct peerlist* peerlistp){
   for (ptr=peerlistp->head, i=0; i<r; ptr=ptr->next, i++)
     ;
   
-  printf("randomly pick %d-th (%hu, %s)\n", 
-	 r, ptr->port, inet_ntoa(ptr->addr));
+  printf("randomly pick %d-th nbr (%s) to reply\n", 
+	 r, inet_ntoa(ptr->addr));
   return ptr;
 }
 
