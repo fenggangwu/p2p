@@ -25,9 +25,9 @@ xiang@trombone (~) % peer /home/grad04/xiang/trombone silver.cs.umn.edu [
 
 
 Step 4:
-xiang@cello (~) % get mydoc4 
-xiang@oboe (~) % share mydoc3 saxophone.cs.umn.edu
+get mydoc4 
+share mydoc3 saxophone.cs.umn.edu
 
 Step 5:
-xiang@cello (~) % list
-xiang@cello (~) % quit
+list
+quit
