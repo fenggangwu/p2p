@@ -158,7 +158,6 @@ char *argv[];
 	if((nmatch = sscanf(bufread, "get %s", filename)) == 1){
 	  //  printf("get <%s>\n", filename);
 	  for(ptr = peerlistp->head; ptr; ptr = ptr->next){
-	    ipportprint(ptr);
 	    if((pid = fork()) < 0){
 	      perror("fork");
 	      exit(-1);
@@ -177,8 +176,8 @@ char *argv[];
 	    /* else */
 	    /*   printf("peer: child, fork successed.\n"); */
 	  }
-	  puts("schedule time, time out = 5 sec");
-	  alarm(5);
+	  puts("schedule time, time out = 3 sec");
+	  alarm(3);
 	}else if(errno !=0){
 	  perror("scanf");
 	}else{
@@ -186,19 +185,25 @@ char *argv[];
 	}
       }else if(!strncmp(bufread, "share", 5)){
 	if((nmatch = sscanf(bufread, "share %s %s", filename, otherhost)) == 2){
-	  if((pid = fork())<0){
-	    perror("fork");
-	    exit(-1);
-	  }
-	  if(pid ==0){
-	    strcpy(path, sharedir);
-	    strcat(path, "/");
-	    strcat(path, filename);
-	    if(execl("messenger", "messenger",
-		     otherhost,
-		     "push", path, NULL)<0){
-	      perror("execl");
+
+	  strcpy(path, sharedir);
+	  strcat(path, "/");
+	  strcat(path, filename);
+
+	  if(access(path, F_OK)){
+	    printf("file %s does not exist\n", filename);
+	  }else{
+	    if((pid = fork())<0){
+	      perror("fork");
 	      exit(-1);
+	    }
+	    if(pid ==0){
+	      if(execl("messenger", "messenger",
+		       otherhost,
+		       "push", path, NULL)<0){
+		perror("execl");
+		exit(-1);
+	      }
 	    }
 	  }
 	  

@@ -166,6 +166,11 @@ char *argv[];
 	      break;
 
 	    }else if(!strcmp(argv[2], "push")){
+	      if(access(argv[3], F_OK)){
+		printf("file %s does not exist\n", argv[3]);
+		break;
+	      }
+
 	      stat(argv[3], &st);
 	      size = st.st_size;
 	      /* msg format: push file.txt size_in_byte*/
