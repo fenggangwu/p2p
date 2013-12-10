@@ -219,7 +219,6 @@ char *argv[];
 	  free(namelist);
 	}
       }else if(!strncmp(bufread, "quit", 4)){
-	printf("0\n");fflush(stdout);
 	if((pid = fork())<0){
 	  perror("fork");
 	  exit(-1);
