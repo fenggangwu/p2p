@@ -277,5 +277,6 @@ char *argv[];
     perror("sock");
     exit(-1);
   }
+  fflush(stdout);
   return 0;
 } /* main - client.c */

@@ -148,7 +148,10 @@ char *argv[];
       if(!strncmp(bufread, "get", 3)){
 	if((nmatch = sscanf(bufread, "get %s", filename)) == 1){
 	  printf("get <%s>\n", filename);
+
+
 	  for(ptr = peerlistp->head; ptr; ptr = ptr->next){
+	    ipportprint(ptr);
 	    if((pid = fork()) < 0){
 	      perror("fork");
 	      exit(-1);
@@ -162,7 +165,10 @@ char *argv[];
 		exit(-1);
 	      }
 	    }
-	    printf("peer: fork successed.\n");
+	    if(pid)
+	      printf("peer: parent, fork successed.\n");
+	    else
+	      printf("peer: child, fork successed.\n");
 	  }
 	}else if(errno !=0){
 	  perror("scanf");
@@ -207,6 +213,23 @@ char *argv[];
 	  free(namelist);
 	}
       }else if(!strncmp(bufread, "quit", 4)){
+	printf("0\n");fflush(stdout);
+	if((pid = fork())<0){
+	  perror("fork");
+	  exit(-1);
+	}
+	if(pid ==0){
+	  if(execl("messenger", "messenger",
+		   argv[2],
+		   "quit", NULL)<0){
+	    perror("execl");
+	    exit(-1);
+	  }
+	}
+
+
+	printf("A\n");fflush(stdout);
+
 	strcpy(nbrlist, ""); /* init */
 	for(i=1, ptr=peerlistp->head; i < peerlistp->cnt; 
 	    i++, ptr=ptr->next){ /*stop before the last one*/
@@ -223,15 +246,17 @@ char *argv[];
 	    }
 	  }
 	  if(i > 1){
-	    strcat(nbrlist, " ");
+	    strcat(nbrlist, DELIMITER);
 	  }
 	  strcat(nbrlist, inet_ntoa(ptr->addr));
 	}
-
+	printf("B\n");fflush(stdout);
 	if((pid = fork())<0){
 	  perror("fork");
 	  exit(-1);
 	}
+
+	printf("C\n");fflush(stdout);
 	if(pid ==0){
 	  if(execl("messenger", "messenger",
 		   inet_ntoa(ptr->addr),
@@ -240,6 +265,14 @@ char *argv[];
 	    exit(-1);
 	  }
 	}
+
+	printf("D\n");fflush(stdout);
+	if(close(request_sock)){
+	  perror("close");
+	  exit(-1);
+	}
+	printf("E\n");fflush(stdout);
+	return 0;/*quit from the program*/
       }else if(!strncmp(bufread, "reg", 3)){
 	if((nmatch = sscanf(bufread, "reg %s", otherhost)) == 1){
 	  printf("reg <%s>\n", otherhost);
@@ -264,7 +297,7 @@ char *argv[];
       }else{
 	printf("invalid command: %s\n", bufread); /* ignore invalid command*/
       }
-      FD_CLR(fileno(stdin), &rmask);
+      FD_CLR(fileno(stdout), &rmask);
     }
 
     if (FD_ISSET(request_sock, &rmask)) {
@@ -315,8 +348,11 @@ char *argv[];
 
 	addrlen = sizeof(remote);
 	if(getsockname(fd, (struct sockaddr*)&remote, &addrlen)<0){
+	  //	  FD_CLR(fd, &mask);
+	  //	  FD_CLR(fd, &rmask);
 	  perror("getsockname");
 	  exit(-1);
+	  continue;
 	}
 
 	//ip = inet_ntoa(remote.sin_addr);
@@ -461,6 +497,30 @@ char *argv[];
 		}
 	      }
 	    }
+	  }else if (!strcmp(tok, "quit")){
+	    if ((tok = strtok(NULL, DELIMITER))){
+	      /*delete the quiting peer*/
+	      ip = tok;
+	      peerlistdelete(peerlistp, P2PSERV, ip);
+
+	      /* take over its nbrs if any*/
+	      while((tok = strtok(NULL, DELIMITER))){
+		peerlistinsert(peerlistp, P2PSERV, tok);
+		
+		if((pid = fork())<0){
+		  perror("fork");
+		  exit(-1);
+		}
+		if(pid ==0){
+		  if(execl("messenger", "messenger",
+			   tok, "reg", NULL)<0){
+		    perror("execl");
+		    exit(-1);
+		  }
+		}
+	      }
+	    }
+
 	  }else {
 	    ;/* ignore illegal message here */
 	  }
@@ -475,5 +535,10 @@ char *argv[];
       }
     }
   }
+  if(close(request_sock)){
+    perror("close");
+    exit(-1);
+  }
+  return 0;
 } /* main - server.c */
 

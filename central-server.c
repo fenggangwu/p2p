@@ -26,7 +26,7 @@ char *argv[];
 
 
   int request_sock, new_sock;
-  int nfound, fd, maxfd, bytesread;
+  int nfound, fd, maxfd, bytesread, n;
   int pid;
   unsigned addrlen;
   fd_set rmask, mask;
@@ -161,7 +161,8 @@ char *argv[];
 	      ip = tok;
 	      printf("reg from %s\n", ip);
 	      ptr = peerlistrand(peerlistp);
-	      peerlistinsert(peerlistp, P2PSERV, ip);
+	      n = peerlistinsert(peerlistp, P2PSERV, ip);
+	      printf("insert nbr success, %d nbrs now\n", peerlistp->cnt);
 	      if(ptr){/*if nbr exists, randomly pick one to reply */
 		if((pid = fork())<0){
 		  perror("fork");
@@ -176,6 +177,13 @@ char *argv[];
 		  }
 		}
 	      }
+	    }
+	  }else if(!strcmp(tok, "quit")){
+	    if ((tok = strtok(NULL, DELIMITER))){
+	      ip = tok;
+	      printf("quit from %s\n", ip);
+	      n = peerlistdelete(peerlistp, P2PSERV, ip);
+	      printf("delete nbr success, %d nbrs remains\n", n);
 	    }
 	  }else {
 	    ;/* ignore illegal message here */

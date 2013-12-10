@@ -107,7 +107,7 @@ struct ipport* peerlistrand(struct peerlist* peerlistp){
   for (ptr=peerlistp->head, i=0; i<r; ptr=ptr->next, i++)
     ;
   
-  printf("randomly pick %d-th nbr (%hu, %s)\n", 
+  printf("randomly pick %d-th (%hu, %s)\n", 
 	 r, ptr->port, inet_ntoa(ptr->addr));
   return ptr;
 }
