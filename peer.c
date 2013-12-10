@@ -13,8 +13,15 @@
 #include <string.h>
 #include "const.h"
 #include <dirent.h>
+#include <signal.h>
 
 
+void
+catch_alarm (int sig)
+{
+  puts("Time out for get!");
+  signal (sig, catch_alarm);
+}
 
 int main(argc, argv)
 int argc;
@@ -61,6 +68,8 @@ char *argv[];
   /* neighbor list */
   struct peerlist apeerlist, *peerlistp = &apeerlist;
   peerlistinit(peerlistp);
+
+  signal (SIGALRM, catch_alarm);
 
   if (argc != 3) {
     (void) fprintf(stderr,"usage: %s sharedir central-server-host \n",argv[0]);
@@ -170,6 +179,8 @@ char *argv[];
 	    else
 	      printf("peer: child, fork successed.\n");
 	  }
+	  puts("schedule time, time out = 5 sec");
+	  alarm(5);
 	}else if(errno !=0){
 	  perror("scanf");
 	}else{
@@ -297,7 +308,7 @@ char *argv[];
       }else{
 	printf("invalid command: %s\n", bufread); /* ignore invalid command*/
       }
-      FD_CLR(fileno(stdout), &rmask);
+      FD_CLR(fileno(stdin), &rmask);
     }
 
     if (FD_ISSET(request_sock, &rmask)) {
@@ -348,6 +359,7 @@ char *argv[];
 
 	addrlen = sizeof(remote);
 	if(getsockname(fd, (struct sockaddr*)&remote, &addrlen)<0){
+	  printf("fd = %d\n", fd);
 	  //	  FD_CLR(fd, &mask);
 	  //	  FD_CLR(fd, &rmask);
 	  perror("getsockname");
@@ -445,6 +457,7 @@ char *argv[];
 	    if ((tok = strtok(NULL, DELIMITER))){
 	      strcpy(filename, tok);
 	      if ((tok = strtok(NULL, DELIMITER))){
+		alarm(0); /*file found, reset alarm*/
 		size = atoi(tok);
 		strcpy(path, sharedir);
 		strcat(path, "/");
